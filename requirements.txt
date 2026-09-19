@@ -1,0 +1,43 @@
+# Core deep learning
+torch
+torchvision
+
+# Computer vision & image processing
+opencv-python-headless
+scikit-image
+scipy
+PyWavelets
+albumentations
+
+# Machine learning & metrics
+scikit-learn
+
+# Explainability
+grad-cam
+
+# Data & utilities
+pyyaml
+pandas
+numpy
+matplotlib
+seaborn
+psutil
+
+# Training infrastructure
+tensorboard
+tqdm
+
+# Dataset access
+kaggle
+
+# Web dashboard
+streamlit
+fpdf2
+
+# Deployment export (optional — install for ONNX export and ORT inference)
+# onnx
+# onnxruntime          # CPU-only ORT (faster inference without CUDA)
+# onnxruntime-gpu      # GPU ORT (uncomment instead of onnxruntime when using CUDA)
+
+# Testing
+pytest

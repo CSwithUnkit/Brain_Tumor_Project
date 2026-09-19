@@ -1,0 +1,88 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+.env
+
+# PyTorch & Machine Learning
+*.pt
+*.ckpt
+runs/
+checkpoints/*
+!checkpoints/unet/
+!checkpoints/unet/best_unet_enhanced.pth
+!checkpoints/classification/
+!checkpoints/classification/best_efficientnet_exp2_enhanced.pth
+!checkpoints/classification/best_efficientnet_exp1_baseline.pth
+*.pth
+!checkpoints/unet/best_unet_enhanced.pth
+!checkpoints/classification/best_efficientnet_exp2_enhanced.pth
+!checkpoints/classification/best_efficientnet_exp1_baseline.pth
+
+# Datasets & Cloud Storage
+datasets/raw/
+datasets/processed/
+data/brisc/
+data/pmram/
+data/cached_enhanced/
+.google_drive_mount
+kaggle.json
+
+# Logs and reports
+*.log
+ingestion_summary.log
+
+# Large binary files
+*.deb
+*.zip
+*.tar.gz
+
+# TensorBoard runs
+runs/
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Security & Credentials (STRICT DENYLIST)
+kaggle.json
+*/kaggle.json
+**/*.key
+**/*.pem
+**/*.token
+.env
+.env.*
+credentials.json
+client_secret*.json
+*.log

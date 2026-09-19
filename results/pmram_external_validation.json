@@ -1,0 +1,74 @@
+{
+    "pmram_metrics": {
+        "accuracy": 0.9122923588039867,
+        "macro_precision": 0.914641264054466,
+        "macro_recall": 0.9114609105926434,
+        "macro_f1": 0.9108379116393446,
+        "confusion_matrix": [
+            [
+                345,
+                15,
+                7,
+                6
+            ],
+            [
+                7,
+                294,
+                49,
+                13
+            ],
+            [
+                2,
+                2,
+                369,
+                0
+            ],
+            [
+                20,
+                6,
+                5,
+                365
+            ]
+        ]
+    },
+    "brisc_metrics": {
+        "accuracy": 0.88,
+        "macro_precision": 0.8771324003489209,
+        "macro_recall": 0.8830524575924823,
+        "macro_f1": 0.8735897435458322,
+        "confusion_matrix": [
+            [
+                197,
+                17,
+                3,
+                0
+            ],
+            [
+                37,
+                150,
+                21,
+                26
+            ],
+            [
+                0,
+                3,
+                273,
+                0
+            ],
+            [
+                1,
+                0,
+                0,
+                172
+            ]
+        ]
+    },
+    "generalization_gap": {
+        "accuracy": -0.03229235880398673,
+        "macro_precision": -0.03750886370554507,
+        "macro_recall": -0.02840845300016115,
+        "macro_f1": -0.03724816809351239
+    },
+    "num_samples_evaluated": 1505,
+    "data_source": "folder_walk"
+}

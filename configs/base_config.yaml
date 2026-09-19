@@ -1,0 +1,35 @@
+# configs/base_config.yaml
+project_name: "MRI Image Enhancing and Tumor Detection"
+seed: 42
+image_target_dimensions: [256, 256]
+
+paths:
+  # Base paths
+  colab_drive_mount: "/content/drive/MyDrive/Brain_Tumor_Project"
+  local_base: "./"
+  
+  # Raw data paths
+  raw_data_dir: "datasets/raw"
+  brisc_dir: "datasets/raw/brisc"
+  pmram_dir: "datasets/raw/pmram"
+  
+  # Processed data paths
+  processed_data_dir: "datasets/processed"
+  train_split: "datasets/processed/train"
+  val_split: "datasets/processed/val"
+  test_split: "datasets/processed/test"
+  
+  # Checkpoint save paths
+  checkpoints_dir: "checkpoints"
+  unet_checkpoints: "checkpoints/unet"
+  efficientnet_checkpoints: "checkpoints/efficientnetb2"
+
+  # Logging and outputs
+  logs_dir: "logs"
+
+dataset:
+  brisc_classes: ['glioma', 'meningioma', 'pituitary', 'no_tumor']
+  # Dataset statistics
+  mean: [0.485, 0.456, 0.406] # ImageNet defaults for EfficientNet
+  std: [0.229, 0.224, 0.225]
+  validate_on_load: true

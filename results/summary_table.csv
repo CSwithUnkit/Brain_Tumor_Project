@@ -1,0 +1,4 @@
+Experiment,Best Epoch,Accuracy,Macro F1,Macro Precision,Macro Recall
+exp1_baseline,30,98.89%,98.91%,98.93%,98.89%
+exp2_enhanced,23,98.22%,98.24%,98.23%,98.25%
+exp3_seg_guided,29,88.33%,87.78%,87.86%,88.61%
