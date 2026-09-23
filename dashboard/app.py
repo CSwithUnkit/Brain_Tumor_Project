@@ -42,140 +42,706 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── CSS: Premium Dark Medical UI ──────────────────────────────────────────────
+# ── CSS: Clinical Light Theme ──────────────────────────────────────────────
 st.markdown("""
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&family=Noto+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Noto+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
 <style>
+/* ─── Design tokens: Taste-Skill Premium ────────── */
+:root {
+    /* surfaces */
+    --bg-page    : #F4F4F5;
+    --bg-card    : #FFFFFF;
+    --bg-sidebar : #FAFAFA;
+    --border     : #E4E4E7;
+    --border-mid : #D4D4D8;
+    
+    /* text scale */
+    --text-hi    : #09090B;
+    --text-body  : #3F3F46;
+    --text-muted : #71717A;
+    --text-faint : #A1A1AA;
+    
+    /* clinical palette — focused */
+    --primary    : #0891B2;
+    --primary-dk : #0E7490;
+    --primary-lt : #ECFEFF;
+    --danger     : #E11D48;
+    --success    : #059669;
+    
+    /* spacing */
+    --sp-2: 8px;
+    --sp-4: 16px;
+    --sp-6: 24px;
+    --sp-8: 32px;
+    
+    /* elevations */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.025);
+    
+    /* radii */
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 16px;
+}
+
 /* ─── Reset & base ─────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 
 .stApp {
-    background: #070B12;
-    color: #e2e8f0;
-    font-family: 'Inter', 'Plus Jakarta Sans', sans-serif;
+    background: var(--bg-page) !important;
+    color: var(--text-body);
+    font-family: 'Noto Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
 }
+[data-testid="stAppViewContainer"] { background: var(--bg-page); }
+[data-testid="stHeader"] { background: var(--bg-page) !important; border-bottom: 1px solid var(--border) !important; }
 
 /* ─── Sidebar ───────────────────────────────────── */
 section[data-testid="stSidebar"] {
-    background: #0F172A !important;
-    border-right: 1px solid rgba(51, 65, 85, 0.5) !important;
+    background: var(--bg-sidebar) !important;
+    border-right: 1px solid var(--border) !important;
+}
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
+section[data-testid="stSidebar"] label,
+section[data-testid="stSidebar"] span {
+    color: var(--text-body) !important;
+}
+/* inputs, date pickers, selects — premium treatment */
+section[data-testid="stSidebar"] input,
+section[data-testid="stSidebar"] [data-baseweb="input"] > div,
+section[data-testid="stSidebar"] [data-baseweb="select"] > div,
+section[data-testid="stSidebar"] [data-baseweb="base-input"],
+section[data-testid="stSidebar"] [data-testid="stDateInput"] input,
+section[data-testid="stSidebar"] [data-testid="stDateInput"] > div > div {
+    background: var(--bg-card) !important;
+    border-color: var(--border) !important;
+    color: var(--text-hi) !important;
+    border-radius: var(--radius-sm) !important;
+    box-shadow: var(--shadow-sm) !important;
+    transition: all 0.2s ease !important;
+}
+section[data-testid="stSidebar"] input:focus,
+section[data-testid="stSidebar"] [data-baseweb="input"] > div:focus-within,
+section[data-testid="stSidebar"] [data-baseweb="select"] > div:focus-within {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 1px var(--primary) !important;
+}
+/* file uploader drop zone */
+section[data-testid="stSidebar"] [data-testid="stFileUploader"] > div,
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"],
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] > div {
+    background: var(--bg-card) !important;
+    border: 1.5px dashed var(--border-mid) !important;
+    border-radius: var(--radius-md) !important;
+    color: var(--text-muted) !important;
+    transition: border-color 0.2s ease, background 0.2s ease !important;
+}
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"]:hover {
+    border-color: var(--primary) !important;
+    background: var(--primary-lt) !important;
+}
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] span,
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] p,
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] small {
+    color: var(--text-muted) !important;
+}
+section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] button {
+    background: var(--bg-page) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text-hi) !important;
+    box-shadow: var(--shadow-sm) !important;
+    border-radius: var(--radius-sm) !important;
+}
+/* select dropdown popover (opens outside sidebar) */
+[data-baseweb="popover"] [data-baseweb="menu"],
+[data-baseweb="popover"] ul {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-md) !important;
+    box-shadow: var(--shadow-lg) !important;
+}
+[data-baseweb="popover"] [role="option"] {
+    color: var(--text-body) !important;
+    font-family: 'Noto Sans', sans-serif !important;
+    font-size: 14px !important;
+}
+[data-baseweb="popover"] [role="option"]:hover,
+[data-baseweb="popover"] [aria-selected="true"] {
+    background: var(--primary-lt) !important;
+    color: var(--primary-dk) !important;
+}
+/* date picker calendar */
+[data-baseweb="calendar"],
+[data-baseweb="datepicker"] {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-md) !important;
+    box-shadow: var(--shadow-lg) !important;
+}
+[data-baseweb="calendar"] * {
+    color: var(--text-body) !important;
+    font-family: 'Noto Sans', sans-serif !important;
+}
+[data-baseweb="calendar"] [aria-selected="true"] > div {
+    background: var(--primary) !important;
+    color: #fff !important;
+}
+section[data-testid="stSidebar"] hr { border-color: var(--border) !important; margin: 1.5rem 0 !important; }
+
+/* ─── Expander: enforce light theme ────────────── */
+[data-testid="stExpander"] {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-md) !important;
+    overflow: hidden !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+[data-testid="stExpander"] details {
+    background: var(--bg-card) !important;
+}
+[data-testid="stExpander"] details > summary {
+    background: var(--bg-card) !important;
+    color: var(--text-hi) !important;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: 'Figtree', sans-serif;
+    padding: 12px 16px !important;
+}
+[data-testid="stExpander"] details[open] > summary {
+    border-bottom: 1px solid var(--border) !important;
+}
+[data-testid="stExpander"] details > summary:hover {
+    background: var(--bg-sidebar) !important;
+}
+[data-testid="stExpander"] details > div {
+    background: var(--bg-card) !important;
+}
+
+/* ─── Primary CTA → clinical teal (flat, no glow) ─── */
+.stButton > button[kind="primary"],
+.stButton > button[data-testid="baseButton-primary"] {
+    background: var(--primary) !important;
+    border: 1px solid var(--primary-dk) !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    letter-spacing: 0.01em !important;
+    box-shadow: var(--shadow-sm) !important;
+    border-radius: var(--radius-sm) !important;
+    transition: all 0.2s ease !important;
+    font-family: 'Noto Sans', sans-serif !important;
+}
+.stButton > button[kind="primary"]:hover,
+.stButton > button[data-testid="baseButton-primary"]:hover {
+    background: var(--primary-dk) !important;
+    box-shadow: var(--shadow-md) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* ─── Download button ─────────────────────────── */
+.stDownloadButton > button {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--primary) !important;
+    font-weight: 600 !important;
+    border-radius: var(--radius-sm) !important;
+    box-shadow: var(--shadow-sm) !important;
+    transition: all 0.2s ease !important;
+}
+.stDownloadButton > button:hover {
+    background: var(--bg-sidebar) !important;
+    border-color: var(--border-mid) !important;
+}
+
+/* ─── Image grid: uniform 1:1 aspect ratio ──────── */
+[data-testid="stImage"] {
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-top: none;
+    display: block;
+    background: var(--bg-page);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.3s ease;
+}
+[data-testid="stImage"]:hover {
+    box-shadow: var(--shadow-md);
+}
+[data-testid="stImage"] > img {
+    width: 100% !important;
+    height: 100% !important;
+    aspect-ratio: 1 / 1;
+    object-fit: cover !important;
+    border-radius: 0 0 var(--radius-md) var(--radius-md) !important;
+    display: block !important;
+}
+
+/* ─── Streamlit native element resets ──────────── */
+[data-testid="stDivider"] hr, hr { border-color: var(--border) !important; }
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
+
+/* ─── Letterhead header ────────────────────────── */
+.rpt-header {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-bottom: var(--sp-6);
+    box-shadow: var(--shadow-sm);
+}
+.rpt-header-top {
+    padding: var(--sp-6) var(--sp-8);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-card);
+}
+.rpt-title {
+    font-family: 'Figtree', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text-hi);
+    letter-spacing: -0.02em;
+}
+.rpt-subtitle {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    font-family: 'Noto Sans', sans-serif;
+}
+.rpt-meta-row {
+    padding: var(--sp-4) var(--sp-8);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--sp-4) var(--sp-6);
+    background: var(--bg-sidebar);
+}
+.rpt-meta-cell { display: flex; flex-direction: column; gap: 4px; }
+.rpt-meta-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    font-family: 'Noto Sans', sans-serif;
+}
+.rpt-meta-value {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-hi);
+    font-family: 'Noto Sans', sans-serif;
 }
 
 /* ─── Pipeline step cards ───────────────────────── */
 .pipeline-card {
-    background: #0F172A;
-    border: 1px solid rgba(51, 65, 85, 0.5);
-    border-radius: 8px;
-    padding: 0.75rem;
-    margin-bottom: 0.5rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-mid);
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    padding: 12px 16px;
+    margin-bottom: 0;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2);
 }
 .pipeline-card .step-label {
-    font-size: 0.7rem; font-weight: 600; color: #94a3b8;
-    letter-spacing: 0.05em; text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-hi);
+    letter-spacing: 0.02em;
+    font-family: 'Figtree', sans-serif;
 }
+.step-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 12px;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    font-family: 'Noto Sans', sans-serif;
+}
+.badge-tumor { color: #9F1239; background: #FFE4E6; border: 1px solid #FECDD3; }
+.badge-clear { color: #065F46; background: #D1FAE5; border: 1px solid #A7F3D0; }
+.badge-cnr   { color: #075985; background: #E0F2FE; border: 1px solid #BAE6FD; }
 
-/* ─── Diagnosis panel ───────────────────────────── */
+/* ─── Diagnosis panel (The Focal Point) ─────────── */
 .diag-panel {
-    border-radius: 8px; padding: 1.5rem;
-    border: 1px solid rgba(51, 65, 85, 0.5);
-    background: #0F172A;
+    border-radius: var(--radius-lg);
+    padding: var(--sp-6) var(--sp-8);
+    border: 1px solid var(--border);
+    border-left: 6px solid var(--primary);
+    background: var(--bg-card);
+    box-shadow: var(--shadow-lg);
+    height: 100%;
+    position: relative;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
+.diag-panel:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+}
+.diag-panel.diag-positive { border-left-color: var(--danger); }
+.diag-panel.diag-negative { border-left-color: var(--success); }
 .diag-label {
-    font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase;
-    color: #94a3b8; margin-bottom: 0.5rem;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: var(--sp-2);
+    font-family: 'Noto Sans', sans-serif;
 }
 .diag-value {
-    font-size: 1.8rem; font-weight: 700; margin-bottom: 0.2rem;
+    font-family: 'Figtree', sans-serif;
+    font-size: clamp(24px, 3vw, 32px);
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    max-width: 100%;
+    margin-bottom: var(--sp-4);
+    color: var(--text-hi);
 }
-.diag-conf { font-size: 0.85rem; color: #94a3b8; }
+.diag-conf {
+    font-size: 15px;
+    color: var(--text-body);
+    font-family: 'Noto Sans', sans-serif;
+    padding: 8px 12px;
+    background: var(--bg-sidebar);
+    border-radius: var(--radius-sm);
+    display: inline-block;
+    border: 1px solid var(--border);
+}
 
-/* ─── TypeUI / Shadcn colour tokens ─────────────── */
-:root {
-    --shadcn-border  : rgba(51, 65, 85, 0.5);
-    --shadcn-emerald : #10B981;
-    --shadcn-violet  : #6366F1;
-    --shadcn-cyan    : #06B6D4;
-    --shadcn-rose    : #F43F5E;
-    --shadcn-amber   : #F59E0B;
+/* ─── Softmax confidence bars ───────────────────── */
+.prob-section-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: var(--sp-4);
+    font-family: 'Figtree', sans-serif;
+}
+.prob-row { margin-bottom: var(--sp-4); }
+.prob-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 6px;
+}
+.prob-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-hi);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 76%;
+    font-family: 'Noto Sans', sans-serif;
+}
+.prob-pct {
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'Noto Sans Mono', monospace;
+    color: var(--text-hi);
+    flex-shrink: 0;
+    text-align: right;
+    min-width: 44px;
+}
+.prob-track {
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.prob-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ─── Morphometrics data table ──────────────────── */
+.morph-table-wrap {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+.morph-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    font-family: 'Noto Sans', sans-serif;
+}
+.morph-table th {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    background: var(--bg-sidebar);
+}
+.morph-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-body);
+    vertical-align: middle;
+}
+.morph-table tr:hover td {
+    background: var(--bg-page);
+}
+.morph-table tr:last-child td { border-bottom: none; }
+.morph-table td:last-child {
+    font-family: 'Noto Sans Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-hi);
+    text-align: right;
+}
+
+/* ─── Sidebar section headers ───────────────────── */
+.sb-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-hi);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 4px 0 8px 0;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    font-family: 'Figtree', sans-serif;
+}
+.sb-head svg { opacity: 0.7; flex-shrink: 0; }
+
+/* ─── Document section divider (counseling) ─────── */
+.c-doc-divider {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
+    margin: var(--sp-6) 0 var(--sp-4) 0;
+}
+.c-doc-divider hr {
+    flex: 1;
+    border: none;
+    border-top: 1px dashed var(--border-mid);
+    margin: 0;
+}
+.c-doc-divider span {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-family: 'Noto Sans', sans-serif;
 }
 
 /* ─── Clinical counseling section ───────────────── */
 .counseling-section {
-    background: #0F172A;
-    border: 1px solid var(--shadcn-border);
-    border-radius: 12px;
-    padding: 1.5rem;
-    margin-top: 0.5rem;
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    padding: var(--sp-6) var(--sp-8);
 }
 .counseling-header {
-    display: flex; align-items: center; gap: 0.75rem;
-    border-bottom: 1px solid var(--shadcn-border);
-    padding-bottom: 1rem; margin-bottom: 1.4rem;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--sp-4);
+    padding-bottom: var(--sp-4);
+    margin-bottom: var(--sp-4);
+    border-bottom: 1px solid var(--border);
 }
 .counseling-title {
-    font-size: 1.05rem; font-weight: 600; color: #f8fafc;
+    font-family: 'Figtree', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-hi);
+    letter-spacing: -0.01em;
 }
-.c-section-label {
-    font-size: 0.7rem; font-weight: 600; letter-spacing: 0.05em;
-    text-transform: uppercase; padding: 0.2rem 0.5rem;
-    border-radius: 4px; margin-bottom: 0.5rem; display: inline-block;
+.counseling-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    font-family: 'Noto Sans', sans-serif;
 }
-.c-label-cyan   { color: var(--shadcn-cyan);   background: rgba(6,182,212,0.10); }
-.c-label-amber  { color: var(--shadcn-amber);  background: rgba(245,158,11,0.10); }
-.c-label-violet { color: var(--shadcn-violet); background: rgba(99,102,241,0.10); }
-.c-label-green  { color: var(--shadcn-emerald);background: rgba(16,185,129,0.10); }
+.counseling-badge {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-family: 'Noto Sans', sans-serif;
+}
 .c-body-text {
-    font-size: 0.85rem; color: #cbd5e1; margin-bottom: 1.2rem;
+    font-size: 14px;
+    color: var(--text-body);
+    margin-bottom: var(--sp-4);
+    line-height: 1.7;
+    font-family: 'Noto Sans', sans-serif;
 }
 .c-bullet-item {
-    display: flex; gap: 0.5rem; align-items: flex-start;
-    padding: 0.3rem 0; font-size: 0.85rem; color: #cbd5e1;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 6px 0 6px 8px;
+    font-size: 14px;
+    color: var(--text-body);
+    line-height: 1.6;
+    font-family: 'Noto Sans', sans-serif;
 }
 .c-checklist-item {
-    display: flex; gap: 0.5rem; align-items: flex-start;
-    padding: 0.3rem 0; font-size: 0.85rem; color: #cbd5e1;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 6px 0 6px 8px;
+    font-size: 14px;
+    color: var(--text-body);
+    line-height: 1.6;
+    font-family: 'Noto Sans', sans-serif;
 }
 .c-checkbox {
-    width: 14px; height: 14px; border: 1.5px solid #64748b;
-    border-radius: 3px; flex-shrink: 0; margin-top: 0.15rem;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border-mid);
+    border-radius: 4px;
+    flex-shrink: 0;
+    margin-top: 3px;
 }
 
 /* ─── Empty State ───────────────────────────────── */
+@keyframes brain-pulse {
+    0%, 100% { opacity: 0.6; transform: scale(1); }
+    50%       { opacity: 1; transform: scale(1.05); }
+}
 .empty-state {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    padding: 4rem 2rem; text-align: center;
-    background: #0F172A; border-radius: 12px; border: 1px dashed rgba(51, 65, 85, 0.5);
-    margin: 2rem 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 40px;
+    text-align: center;
+    background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-page) 100%);
+    border-radius: var(--radius-lg);
+    border: 2px dashed var(--border-mid);
+    margin: var(--sp-8) 0;
+    box-shadow: var(--shadow-sm);
+    transition: border-color 0.3s ease;
 }
-.empty-icon {
-    font-size: 4rem;
-    margin-bottom: 1rem;
-    animation: float 3s ease-in-out infinite;
+.empty-state:hover {
+    border-color: var(--text-faint);
 }
-@keyframes float {
-    0% { transform: translateY(0px); }
-    50% { transform: translateY(-10px); }
-    100% { transform: translateY(0px); }
+.empty-brain-icon {
+    display: block;
+    margin-bottom: 24px;
+    animation: brain-pulse 4s ease-in-out infinite;
+    transform-origin: center;
+    color: var(--primary);
 }
 .empty-title {
-    font-size: 1.25rem; font-weight: 600; color: #f8fafc; margin-bottom: 0.5rem;
+    font-family: 'Figtree', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-hi);
+    margin-bottom: 8px;
 }
 .empty-sub {
-    font-size: 0.85rem; color: #94a3b8; max-width: 400px; line-height: 1.4;
+    font-size: 15px;
+    color: var(--text-muted);
+    max-width: 480px;
+    line-height: 1.6;
+    font-family: 'Noto Sans', sans-serif;
+}
+.empty-cap-list {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 24px;
+}
+.empty-cap {
+    font-size: 13px;
+    color: var(--text-hi);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-family: 'Noto Sans', sans-serif;
+    box-shadow: var(--shadow-sm);
+}
+
+/* ─── Streamlit alert boxes → light theme ───────── */
+[data-testid="stAlert"] {
+    background: #FFFBEB !important;
+    border: 1px solid #FDE68A !important;
+    border-radius: var(--radius-md) !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+/* Info variant */
+[data-testid="stAlert"][data-type="info"],
+.stAlert[data-type="info"],
+[data-testid="stAlert"].element-container {
+    background: var(--primary-lt) !important;
+    border-color: #BAE6FD !important;
+}
+[data-testid="stAlert"] p,
+[data-testid="stAlert"] li,
+[data-testid="stAlert"] div {
+    color: var(--text-body) !important;
+    font-family: 'Noto Sans', sans-serif !important;
+    font-size: 14px !important;
+}
+section[data-testid="stSidebar"] [data-testid="stAlert"] {
+    background: #FFFBEB !important;
+    border-color: #FDE68A !important;
+}
+
+/* ─── Spinner text ──────────────────────────────── */
+[data-testid="stSpinner"] p,
+[data-testid="stSpinner"] span {
+    color: var(--text-muted) !important;
+    font-family: 'Noto Sans', sans-serif !important;
+    font-size: 14px !important;
+}
+
+/* ─── Counseling bullet dot ─────────────────────── */
+.c-bullet-dot {
+    color: var(--primary);
+    font-size: 20px;
+    line-height: 1.4;
+    flex-shrink: 0;
+    margin-top: -3px;
+    display: inline-block;
+    width: 16px;
+    text-align: center;
+}
+
+/* ─── Force main content area background ───────── */
+[data-testid="stMain"],
+[data-testid="stMainBlockContainer"],
+.main .block-container {
+    background: var(--bg-page) !important;
 }
 </style>
-""", unsafe_allow_html=True)
-
-# ── Header ────────────────────────────────────────────────────────────────────
-st.markdown("""
-<div class="neuro-header" style="background: #0F172A; border: 1px solid rgba(51, 65, 85, 0.5); border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
-  <div class="neuro-title" style="font-size: 1.5rem; font-weight: 600; color: #f8fafc; margin-bottom: 0.5rem;">MRI Image Enhancement and Tumor Detection</div>
-  <div class="badge-row" style="display: flex; gap: 0.75rem;">
-    <span style="font-size: 0.75rem; color: #10B981; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); padding: 0.2rem 0.5rem; border-radius: 4px;">System: Online (Auto-Detected GPU/CPU)</span>
-    <span style="font-size: 0.75rem; color: #60A5FA; background: rgba(96, 165, 250, 0.1); border: 1px solid rgba(96, 165, 250, 0.2); padding: 0.2rem 0.5rem; border-radius: 4px;">Active Pipeline: Exp 2 Enhanced (98.2% F1)</span>
-  </div>
-</div>
 """, unsafe_allow_html=True)
 
 # ── Helper functions ──────────────────────────────────────────────────────────
@@ -205,49 +771,75 @@ def calculate_biomarkers(mask, raw_img, enh_img):
         cnr = ((ec - rc) / rc) * 100 if rc > 0 else 0.0
     return pixels, centroid, bbox, cnr, perimeter
 
-def prob_bar_html(label, value, color="#3b82f6"):
+def prob_bar_html(label: str, value: float, rank: int = 0) -> str:
+    """Render a confidence bar using a single teal opacity scale.
+    rank=0 → highest confidence (solid teal); higher rank → lighter fill.
+    Sorted by caller (descending confidence).
+    """
+    pct = value * 100
+    # Teal opacity: rank 0 = 1.0, rank 1 = 0.72, rank 2 = 0.48, rank 3 = 0.28
+    opacity = max(0.25, 1.0 - rank * 0.25)
     return f"""
-    <div style="margin-bottom: 0.6rem;">
-      <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #cbd5e1; margin-bottom: 0.2rem;">
-        <span>{label}</span><span style="font-weight: 600; color: {color}">{value * 100:.1f}%</span>
+    <div class="prob-row">
+      <div class="prob-header">
+        <span class="prob-label">{label}</span>
+        <span class="prob-pct">{pct:.1f}%</span>
       </div>
-      <div style="height: 4px; background: rgba(51, 65, 85, 0.5); border-radius: 2px; overflow: hidden;">
-        <div style="height: 100%; width: {value * 100:.1f}%; background: {color}; box-shadow: 0 0 8px {color}; border-radius: 2px;"></div>
+      <div class="prob-track">
+        <div class="prob-fill" style="width:{pct:.2f}%; background:rgba(8,145,178,{opacity:.2f});"></div>
       </div>
     </div>"""
 
+# ── Sidebar SVG icon helpers ──────────────────────────────────────────────────
+_SB_ICO = {
+    "upload" : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
+    "patient": '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+    "ai"     : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
+    "status" : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+    "hw"     : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>',
+}
+
+def _sbhead(icon_key: str, title: str) -> str:
+    """Return a styled sidebar section header with an inline SVG icon."""
+    return f'<div class="sb-head">{_SB_ICO[icon_key]}<span>{title}</span></div>'
+
 # ── Sidebar ───────────────────────────────────────────────────────────────────
-st.sidebar.markdown("### 📋 Patient Metadata")
+st.sidebar.markdown(_sbhead("upload", "MRI Upload"), unsafe_allow_html=True)
+upload = st.sidebar.file_uploader("Upload Scan (PNG / JPG)", type=['png', 'jpg', 'jpeg'])
+
+st.sidebar.divider()
+st.sidebar.markdown(_sbhead("patient", "Patient Metadata"), unsafe_allow_html=True)
 patient_id  = st.sidebar.text_input("Patient ID", value="PID-90210", label_visibility="visible")
 scan_date   = st.sidebar.date_input("Scan Date", value=datetime.today())
 sequence    = st.sidebar.selectbox("MRI Sequence", [
-    "T1-Weighted Contrast Enhanced", "T2-Weighted", "FLAIR", "DWI"])
+    "T1-Weighted CE", "T2-Weighted", "FLAIR", "DWI"])
 institution = st.sidebar.text_input("Institution", value="ITS Engineering College")
 
 st.sidebar.divider()
-st.sidebar.markdown("### 🤖 AI Configuration")
+st.sidebar.markdown(_sbhead("ai", "AI Configuration"), unsafe_allow_html=True)
 model_choice = st.sidebar.selectbox("Active Pipeline", [
-    "Exp 2: Enhanced (Recommended - 98.2% Acc)", 
-    "Exp 1: Baseline (98.9% Acc)", 
-    "Exp 3: Segmentation-Guided"], index=0)
+    "Exp 2: Enhanced (98.2%)",
+    "Exp 1: Baseline (98.9%)",
+    "Exp 3: Seg-Guided"], index=0)
 
 model_map = {
-    "Exp 1: Baseline (98.9% Acc)"          : "classification/best_efficientnet_exp1_baseline.pth",
-    "Exp 2: Enhanced (Recommended - 98.2% Acc)"          : "classification/best_efficientnet_exp2_enhanced.pth",
-    "Exp 3: Segmentation-Guided": "classification/best_efficientnet_exp3_seg_guided.pth",
+    "Exp 1: Baseline (98.9%)"  : "classification/best_efficientnet_exp1_baseline.pth",
+    "Exp 2: Enhanced (98.2%)"  : "classification/best_efficientnet_exp2_enhanced.pth",
+    "Exp 3: Seg-Guided"        : "classification/best_efficientnet_exp3_seg_guided.pth",
 }
 
 st.sidebar.divider()
-st.sidebar.markdown("### 🔌 System Status")
+st.sidebar.markdown(_sbhead("status", "System Status"), unsafe_allow_html=True)
 ckpt_dir   = PROJECT_ROOT / "checkpoints"
 seg_path   = ckpt_dir / "unet/best_unet_enhanced.pth"
 class_path = ckpt_dir / model_map[model_choice]
 
 def status_html(label, ok):
-    dot = "online" if ok else "offline"
-    txt = "ONLINE" if ok else "MISSING"
-    clr = "#10d97a" if ok else "#ef4455"
-    return f'<span class="status-dot {dot}"></span><span style="font-size:0.78rem;color:{clr}">{txt}</span> <span style="font-size:0.78rem;color:#567a8f">{label}</span>'
+    txt = "Online" if ok else "Missing"
+    clr = "#16A34A" if ok else "#DC2626"
+    dot = f'<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:{clr};margin-right:5px;vertical-align:middle"></span>'
+    return (f'{dot}<span style="font-size:13px;color:{clr};font-weight:600;font-family:Noto Sans,sans-serif">{txt}</span>'
+            f' <span style="font-size:13px;color:#64748B;font-family:Noto Sans,sans-serif">{label}</span>')
 
 st.sidebar.markdown(status_html("U-Net Segmentation", seg_path.exists()), unsafe_allow_html=True)
 st.sidebar.markdown(status_html(f"Classifier ({model_choice[:5]})", class_path.exists()), unsafe_allow_html=True)
@@ -257,26 +849,42 @@ if not class_path.exists() or not seg_path.exists():
 
 # ── Hardware badge ────────────────────────────────────────────────────────────
 st.sidebar.divider()
-st.sidebar.markdown("### ⚙️ Inference Hardware")
+st.sidebar.markdown(_sbhead("hw", "Inference Hardware"), unsafe_allow_html=True)
 _p = _HW_PROFILE
 if _p["has_cuda"]:
-    _hw_label = f"🟢 GPU · {_p['gpu_name']}"
+    _hw_label = f"GPU · {_p['gpu_name']}"
     _hw_sub   = f"{_p['vram_gb']:.1f} GB VRAM · AMP fp16"
-    _hw_color = "#10d97a"
+    _hw_color = "#16A34A"
 else:
-    _hw_label = "🔵 CPU-only"
+    _hw_label = "CPU"
     _hw_sub   = f"{_p['total_ram_gb']:.1f} GB RAM · {_p['num_workers']} workers"
-    _hw_color = "#00b2dc"
-_ort_badge = ("ORT ✓" if _ORT_AVAILABLE else "PyTorch") 
+    _hw_color = "#0891B2"
+_ort_badge = ("ORT ✓" if _ORT_AVAILABLE else "PyTorch")
 st.sidebar.markdown(
-    f'<span style="font-size:0.82rem;color:{_hw_color};font-weight:600">{_hw_label}</span><br>'
-    f'<span style="font-size:0.74rem;color:#567a8f">{_hw_sub} · Backend: {_ort_badge}</span>',
+    f'<span style="font-size:13px;color:{_hw_color};font-weight:600;font-family:Noto Sans,sans-serif">{_hw_label}</span><br>'
+    f'<span style="font-size:12px;color:#64748B;font-family:Noto Sans,sans-serif">{_hw_sub} · {_ort_badge}</span>',
     unsafe_allow_html=True
 )
 
-st.sidebar.divider()
-st.sidebar.markdown("### 📂 MRI Upload")
-upload = st.sidebar.file_uploader("Upload Scan (PNG / JPG)", type=['png', 'jpg', 'jpeg'])
+# ── Letterhead Header ──────────────────────────────────────────────────────────
+st.markdown(f"""
+<div class="rpt-header">
+  <div class="rpt-header-top">
+    <div>
+      <div class="rpt-title">NeuroScan AI &mdash; Radiology Decision Support</div>
+      <div class="rpt-subtitle">MRI Neuro-Oncology Inference Platform &nbsp;&middot;&nbsp; {institution}</div>
+    </div>
+  </div>
+  <div class="rpt-meta-row">
+    <div class="rpt-meta-cell"><span class="rpt-meta-label">Patient ID</span><span class="rpt-meta-value">{patient_id}</span></div>
+    <div class="rpt-meta-cell"><span class="rpt-meta-label">Scan Date</span><span class="rpt-meta-value">{scan_date}</span></div>
+    <div class="rpt-meta-cell"><span class="rpt-meta-label">MRI Sequence</span><span class="rpt-meta-value">{sequence}</span></div>
+    <div class="rpt-meta-cell"><span class="rpt-meta-label">Active Pipeline</span><span class="rpt-meta-value">{model_choice}</span></div>
+    <div class="rpt-meta-cell"><span class="rpt-meta-label">Inference Engine</span><span class="rpt-meta-value">EfficientNetB2 + U-Net</span></div>
+    <div class="rpt-meta-cell"><span class="rpt-meta-label">Generated</span><span class="rpt-meta-value">{datetime.now().strftime('%d %b %Y, %H:%M')}</span></div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
 # ── Model loading ─────────────────────────────────────────────────────────────
 @st.cache_resource
@@ -321,13 +929,8 @@ gradcam  = BrainTumorGradCAM(classifier, use_cuda=(device.type == 'cuda'))
 
 # ── Main flow ─────────────────────────────────────────────────────────────────
 CLASSES = ['Intra-axial Glial Neoplasm', 'Extra-axial Dural Lesion', 'Sella Turcica Pituitary Adenoma', 'No Tumor']
-CLASS_COLORS = {
-    'Intra-axial Glial Neoplasm'       : '#ef4455',
-    'Extra-axial Dural Lesion'         : '#f59e0b',
-    'Sella Turcica Pituitary Adenoma': '#a78bfa',
-    'No Tumor'         : '#10d97a',
-}
-PROB_COLORS = ['#ef4455', '#f59e0b', '#a78bfa', '#10d97a']
+# CLASS_COLORS removed — diagnosis state is conveyed by .diag-positive/.diag-negative
+# CSS left-border classes only. Text uses --text-hi token throughout.
 
 # ── Clinical counseling knowledge base ───────────────────────────────────────
 # Full neuro-oncological counseling text keyed by predicted class.
@@ -335,10 +938,10 @@ PROB_COLORS = ['#ef4455', '#f59e0b', '#a78bfa', '#10d97a']
 from reports.pdf_report_generator import COUNSELING_DB, generate_pdf_report, generate_clinical_report_bytes
 
 # ── Counseling HTML helpers ───────────────────────────────────────────────────
-def _c_bullet(text: str, dot_class: str) -> str:
+def _c_bullet(text: str, dot_class: str = "") -> str:
     return (
         f'<div class="c-bullet-item">'
-        f'<span class="{dot_class}">&#8226;</span>'
+        f'<span class="c-bullet-dot">&#8226;</span>'
         f'<span>{text}</span></div>'
     )
 
@@ -355,12 +958,13 @@ def render_counseling_section(pred_class: str) -> None:
     """Render the expandable Clinical Counseling & Patient Guidance section."""
     info = COUNSELING_DB.get(pred_class, COUNSELING_DB['No Tumor'])
     is_tumor = pred_class != 'No Tumor'
-    diag_badge_color = '#F43F5E' if is_tumor else '#10B981'
-    diag_badge_bg    = 'rgba(244,63,94,0.10)' if is_tumor else 'rgba(16,185,129,0.10)'
-    diag_badge_border= 'rgba(244,63,94,0.30)' if is_tumor else 'rgba(16,185,129,0.30)'
+    if is_tumor:
+        badge_style = "color:#DC2626;background:#FEF2F2;border:1px solid #FECACA"
+    else:
+        badge_style = "color:#16A34A;background:#F0FDF4;border:1px solid #BBF7D0"
 
     with st.expander(
-        f"🩺 Clinical Findings & Patient Counseling Guidelines — {pred_class}",
+        f"Clinical Findings & Patient Counseling — {pred_class}",
         expanded=is_tumor,
     ):
         st.markdown(f"""
@@ -370,30 +974,19 @@ def render_counseling_section(pred_class: str) -> None:
               <div class="counseling-title">Clinical Findings &amp; Patient Counseling Guidelines</div>
               <div class="counseling-subtitle">NeuroScan AI &nbsp;&middot;&nbsp; Neuro-Oncology Decision Support</div>
             </div>
-            <span style="margin-left:auto;font-size:0.72rem;font-weight:700;letter-spacing:0.1em;
-              text-transform:uppercase;padding:0.25rem 0.8rem;border-radius:6px;
-              color:{diag_badge_color};background:{diag_badge_bg};border:1px solid {diag_badge_border};
-              font-family:'JetBrains Mono',monospace">{pred_class.upper()}</span>
+            <span class="counseling-badge" style="{badge_style}">{pred_class.upper()}</span>
           </div>
 
-          <!-- 1. Pathological Nature -->
-          <div class="c-section-label c-label-cyan">1 &middot; Pathological Nature &amp; Subtype Rationale</div>
+          <div class="c-doc-divider"><span>1 &middot; Pathological Nature &amp; Subtype Rationale</span><hr></div>
           <div class="c-body-text">{info['pathological_nature']}</div>
 
-          <!-- 2. Critical Patient Precautions -->
-          <div class="c-section-label c-label-amber">2 &middot; Critical Patient Precautions &amp; Red Flag Warning Symptoms</div>
-          {''.join(_c_bullet(p, 'c-bullet-dot-amber') for p in info['precautions'])}
+          <div class="c-doc-divider"><span>2 &middot; Critical Patient Precautions &amp; Red Flag Symptoms</span><hr></div>
+          {''.join(_c_bullet(p, '') for p in info['precautions'])}
 
-          <br>
+          <div class="c-doc-divider"><span>3 &middot; Recommended Confirmatory Diagnostic Workup</span><hr></div>
+          {''.join(_c_bullet(s, '') for s in info['next_steps'])}
 
-          <!-- 3. Next Diagnostic Steps -->
-          <div class="c-section-label c-label-violet" style="margin-top:1.1rem">3 &middot; Recommended Confirmatory Diagnostic Workup</div>
-          {''.join(_c_bullet(s, 'c-bullet-dot-violet') for s in info['next_steps'])}
-
-          <br>
-
-          <!-- 4. Physician Checklist -->
-          <div class="c-section-label c-label-green" style="margin-top:1.1rem">4 &middot; Attending Physician Consultation Checklist</div>
+          <div class="c-doc-divider"><span>4 &middot; Attending Physician Consultation Checklist</span><hr></div>
           {_c_checklist(info['checklist'])}
 
         </div>
@@ -406,15 +999,9 @@ if upload is not None:
 
     if not class_path.exists() or not seg_path.exists():
         st.markdown("""
-        <div style="text-align:center;padding:3rem;background:rgba(245,158,11,0.07);
-            border:1px solid rgba(245,158,11,0.3);border-radius:14px;margin-top:2rem">
-          <div style="font-size:2rem;margin-bottom:0.8rem">⏳</div>
-          <div style="font-size:1.15rem;font-weight:600;color:#f59e0b;margin-bottom:0.5rem">
-            Model Weights Pending
-          </div>
-          <div style="color:#9a7a40;font-size:0.9rem">
-            Train the models on Google Colab (Notebooks 2 &amp; 3) to enable live neural inference.
-          </div>
+        <div style="text-align:center;padding:32px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;margin-top:24px">
+          <div style="font-size:15px;font-weight:600;color:#92400E;font-family:Figtree,Noto Sans,sans-serif;margin-bottom:8px">Model Weights Pending</div>
+          <div style="color:#78350F;font-size:13px;font-family:Noto Sans,sans-serif;line-height:1.6">Train the models on Google Colab (Notebooks 2 &amp; 3) to enable live neural inference.</div>
         </div>""", unsafe_allow_html=True)
         st.stop()
 
@@ -483,16 +1070,22 @@ if upload is not None:
         (c1, raw_rgb,        "1. Raw Acquisition",        ""),
         (c2, enh_rgb,        "2. WPT-LMMSE-CLAHE Contrast", ""),
         (c3, overlay_seg,    "3. U-Net RoI Contour",      "Tumor Detected" if area > 0 else "Clear"),
-        (c4, gradcam_overlay,"4. Grad-CAM Attention",     f"+{cnr:.1f}% CNR" if cnr > 0 else ""),
+        (c4, gradcam_overlay,"4. Grad-CAM Attention",     f"{cnr:+.1f}% CNR" if cnr != 0 else ""),
     ]
     for col, img, title, caption in panels:
         with col:
+            if caption:
+                badge_cls = ("badge-tumor" if "Tumor" in caption
+                             else "badge-cnr" if "CNR" in caption
+                             else "badge-clear")
+                badge_html = f'<span class="step-badge {badge_cls}">{caption}</span>'
+            else:
+                badge_html = ""
             st.markdown(f"""
             <div class="pipeline-card">
-              <div class="step-label">{title}</div>
+              <span class="step-label">{title}</span>
+              {badge_html}
             </div>""", unsafe_allow_html=True)
-            if caption:
-                st.markdown(f"""<div style="position: absolute; margin-top: 10px; margin-left: 10px; z-index: 10; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(51, 65, 85, 0.8); padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; color: #e2e8f0; font-weight: 600;">{caption}</div>""", unsafe_allow_html=True)
             st.image(img, use_container_width=True)
 
     st.divider()
@@ -501,58 +1094,58 @@ if upload is not None:
     col_diag, col_prob, col_morph = st.columns([1.2, 1.2, 1.6])
 
     is_tumor = (pred_class != 'No Tumor')
-    panel_cls = "positive" if is_tumor else "negative"
-    dcolor    = CLASS_COLORS[pred_class]
+    panel_side = "diag-positive" if is_tumor else "diag-negative"
 
     with col_diag:
-        override_html = '<div style="margin-top:0.5rem"><span class="badge badge-amber">Multi-Modal Fusion Override: Lesion Detected by U-Net</span></div>' if fusion_override else ''
+        override_html = (
+            '<div style="margin-top:8px;font-size:12px;color:#0891B2;font-weight:500;'
+            'padding:6px 8px;background:#E0F2FE;border-radius:4px;border:1px solid #BAE6FD;'
+            'font-family:Noto Sans,sans-serif">'
+            'Multi-Modal Fusion Override: Lesion Detected by U-Net</div>'
+        ) if fusion_override else ''
         st.markdown(f"""
-        <div class="diag-panel {panel_cls}">
-          <div class="diag-label {panel_cls}">PRIMARY DIAGNOSIS</div>
-          <div class="diag-value {panel_cls}">{pred_class.upper()}</div>
-          <div class="diag-conf">Confidence: <strong style="color:{dcolor}">{pred_conf:.1f}%</strong></div>
+        <div class="diag-panel {panel_side}">
+          <div class="diag-label">Primary Diagnosis</div>
+          <div class="diag-value">{pred_class}</div>
+          <div class="diag-conf">Confidence: <strong style="font-family:'Noto Sans Mono',monospace;color:var(--text-hi)">{pred_conf:.1f}%</strong></div>
           {override_html}
-          <div style="margin-top:1rem;font-size:0.78rem;color:#567a8f">
+          <div style="margin-top:16px;font-size:13px;color:var(--text-muted);line-height:1.7;font-family:'Noto Sans',sans-serif">
             Pipeline: {model_choice}<br>
             Sequence: {sequence}
           </div>
         </div>""", unsafe_allow_html=True)
 
     with col_prob:
-        st.markdown('<div style="padding-top:0.3rem">', unsafe_allow_html=True)
-        st.markdown('<div class="report-meta" style="margin-bottom:0.8rem;letter-spacing:0.08em">SOFTMAX DISTRIBUTION</div>', unsafe_allow_html=True)
-        for cls, prob, color in zip(CLASSES, probs, PROB_COLORS):
-            st.markdown(prob_bar_html(cls, prob, color), unsafe_allow_html=True)
+        st.markdown('<div style="padding-top:4px">', unsafe_allow_html=True)
+        st.markdown('<div class="prob-section-label">Confidence Distribution</div>', unsafe_allow_html=True)
+        # Sorted descending; rank drives teal opacity (rank 0 = darkest = highest confidence)
+        sorted_probs = sorted(zip(CLASSES, probs), key=lambda x: x[1], reverse=True)
+        for rank, (cls, prob) in enumerate(sorted_probs):
+            st.markdown(prob_bar_html(cls, prob, rank), unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
     with col_morph:
-        st.markdown('<div style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.8rem;">High-Density Morphometrics</div>', unsafe_allow_html=True)
+        st.markdown('<div class="prob-section-label">Morphometric Analysis</div>', unsafe_allow_html=True)
         if area > 0:
             st.markdown(f"""
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
-              <div style="background: #0F172A; border: 1px solid rgba(51, 65, 85, 0.5); border-radius: 6px; padding: 0.8rem;">
-                <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; margin-bottom: 0.2rem;">Tumor Area</div>
-                <div style="font-size: 1.2rem; font-weight: 700; color: #f8fafc;">{area:,} <span style="font-size: 0.7rem; font-weight: 400; color: #94a3b8;">px² (≈ {area/100:.1f} mm²)</span></div>
-              </div>
-              <div style="background: #0F172A; border: 1px solid rgba(51, 65, 85, 0.5); border-radius: 6px; padding: 0.8rem;">
-                <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; margin-bottom: 0.2rem;">CNR Gain</div>
-                <div style="font-size: 1.2rem; font-weight: 700; color: #f8fafc;">+{cnr:.1f}%</div>
-              </div>
-              <div style="background: #0F172A; border: 1px solid rgba(51, 65, 85, 0.5); border-radius: 6px; padding: 0.8rem;">
-                <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; margin-bottom: 0.2rem;">Perimeter</div>
-                <div style="font-size: 1.2rem; font-weight: 700; color: #f8fafc;">{perim:.0f} <span style="font-size: 0.7rem; font-weight: 400; color: #94a3b8;">px</span></div>
-              </div>
-              <div style="background: #0F172A; border: 1px solid rgba(51, 65, 85, 0.5); border-radius: 6px; padding: 0.8rem;">
-                <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; margin-bottom: 0.2rem;">Centroid (X, Y)</div>
-                <div style="font-size: 1.2rem; font-weight: 700; color: #f8fafc;">{centroid if centroid else '—'}</div>
-              </div>
+            <div class="morph-table-wrap">
+              <table class="morph-table">
+                <thead>
+                  <tr><th>Metric</th><th style="text-align:right">Value</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>Tumor Area</td><td>{area:,} px&sup2; &asymp; {area/100:.1f} mm&sup2;</td></tr>
+                  <tr><td>CNR Gain</td><td>{cnr:+.1f}%</td></tr>
+                  <tr><td>Perimeter</td><td>{perim:.0f} px</td></tr>
+                  <tr><td>Centroid (X, Y)</td><td>{centroid if centroid else '&mdash;'}</td></tr>
+                </tbody>
+              </table>
             </div>""", unsafe_allow_html=True)
         else:
             st.markdown("""
-            <div class="metric-tile" style="text-align:center;padding:2rem">
-              <div style="font-size:1.8rem;margin-bottom:0.5rem">✅</div>
-              <div style="color:#10d97a;font-weight:600">No Focal Lesion Detected</div>
-              <div style="font-size:0.8rem;color:#567a8f;margin-top:0.3rem">Morphometry bypassed</div>
+            <div class="morph-table-wrap" style="padding:24px;text-align:center">
+              <div style="font-size:13px;color:#16A34A;font-weight:600;font-family:Noto Sans,sans-serif;margin-bottom:4px">No Focal Lesion Detected</div>
+              <div style="font-size:12px;color:#64748B;font-family:Noto Sans,sans-serif">Morphometric analysis bypassed &mdash; segmentation mask empty</div>
             </div>""", unsafe_allow_html=True)
 
     st.divider()
@@ -564,12 +1157,12 @@ if upload is not None:
 
     # ── PDF Export Button ──────────────────────────────────────────────────────
     st.markdown("""
-    <div style="margin-top: 1.5rem; padding: 1.5rem; background: #0F172A; border: 1px solid rgba(51, 65, 85, 0.5); border-radius: 8px;">
-      <div style="font-size: 1.1rem; font-weight: 600; color: #f8fafc; margin-bottom: 0.5rem;">📄 Official Diagnostic Report</div>
-      <div style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 1rem;">Export complete clinical report with images, biomarkers &amp; counseling guidelines</div>
+    <div style="margin-top:24px;padding:16px 24px;background:var(--bg-card);border:1px solid var(--border);border-left:4px solid var(--primary);border-radius:8px">
+      <div style="font-size:15px;font-weight:600;color:var(--text-hi);font-family:'Figtree','Noto Sans',sans-serif;margin-bottom:4px">Export Official Diagnostic Report</div>
+      <div style="font-size:13px;color:var(--text-muted);font-family:'Noto Sans',sans-serif;line-height:1.6">Generate a complete PDF clinical report including scan images, morphometric biomarkers, confidence distribution, and patient counseling guidelines.</div>
     </div>""", unsafe_allow_html=True)
 
-    if st.button("📄 Export Official Diagnostic Report (PDF)", type="primary", use_container_width=True):
+    if st.button("Export Official Diagnostic Report (PDF)", type="primary", use_container_width=True):
         try:
             report_bytes, mime, ext = generate_clinical_report_bytes(
                 patient_id   = patient_id,
@@ -591,7 +1184,7 @@ if upload is not None:
                 bbox         = bbox,
             )
             
-            label = "⬇️ Download PDF Report" if ext == "pdf" else "⬇️ Download HTML Report (open in browser → Ctrl+P to PDF)"
+            label = "Download PDF Report" if ext == "pdf" else "Download HTML Report — open in browser and use File → Print → Save as PDF"
             fname = f"neuroscan_{patient_id}_{datetime.now().strftime('%Y%m%d_%H%M')}.{ext}"
             
             st.download_button(
@@ -603,8 +1196,8 @@ if upload is not None:
             )
             if ext == "html":
                 st.info(
-                    "📝 HTML report downloaded. Open in any browser and use "
-                    "**File → Print → Save as PDF** for a full A4 clinical PDF."
+                    "HTML report downloaded. Open it in any browser and use "
+                    "**File → Print → Save as PDF** to produce a full A4 clinical PDF."
                 )
         except Exception as e:
             st.error(f"Report generation error: {e}")
@@ -613,14 +1206,27 @@ else:
     # Empty state
     st.markdown("""
     <div class="empty-state">
-      <div class="empty-icon">🧠</div>
+      <div class="empty-brain-icon">
+        <svg width="72" height="72" viewBox="0 0 24 24" fill="none"
+             stroke="#94A3B8" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"
+             xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/>
+          <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/>
+          <path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/>
+          <path d="M17.599 6.5a3 3 0 0 0 .399-1.375"/>
+          <path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/>
+          <path d="M3.477 10.896a4 4 0 0 1 .585-.396"/>
+          <path d="M19.938 10.5a4 4 0 0 1 .585.396"/>
+          <path d="M6 18a4 4 0 0 1-1.967-.516"/>
+          <path d="M19.967 17.484A4 4 0 0 1 18 18"/>
+        </svg>
+      </div>
       <div class="empty-title">Awaiting MRI Scan</div>
-      <div class="empty-sub">Upload a diagnostic scan using the sidebar to begin AI-assisted analysis.</div>
-      <br>
-      <div style="display:flex;justify-content:center;gap:1.5rem;flex-wrap:wrap;margin-top:1rem">
-        <span class="badge badge-cyan" style="animation-delay:0.1s">WPT Enhancement</span>
-        <span class="badge badge-green" style="animation-delay:0.2s">U-Net Segmentation</span>
-        <span class="badge badge-amber" style="animation-delay:0.3s">EfficientNetB2 Classification</span>
-        <span class="badge badge-cyan" style="animation-delay:0.4s">Grad-CAM XAI</span>
+      <div class="empty-sub">Upload a DICOM-compatible diagnostic scan using the sidebar to begin AI-assisted neuro-oncology analysis.</div>
+      <div class="empty-cap-list">
+        <span class="empty-cap">WPT Enhancement</span>
+        <span class="empty-cap">U-Net Segmentation</span>
+        <span class="empty-cap">EfficientNetB2 Classification</span>
+        <span class="empty-cap">Grad-CAM Explainability</span>
       </div>
     </div>""", unsafe_allow_html=True)

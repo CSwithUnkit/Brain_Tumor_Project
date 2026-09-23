@@ -488,7 +488,7 @@ def generate_pdf_report(
         ]
         captions = [
             "Original acquisition",
-            "+44% CNR gain",
+            f"{cnr:+.1f}% CNR gain",
             "Crimson tumour RoI / contour",
             "Model attention heatmap",
         ]
@@ -527,7 +527,7 @@ def generate_pdf_report(
             ("Lesion Perimeter",     f"{perim:.1f} px" if area > 0 else "N/A"),
             ("Centroid (X, Y)",      str(centroid) if centroid else "N/A"),
             ("Bounding Box (XYXY)",  str(bbox) if bbox else "N/A"),
-            ("CNR Enhancement",      f"+{cnr:.1f}% (WPT->LMMSE->CLAHE pipeline)"),
+            ("CNR Enhancement",      f"{cnr:+.1f}% (WPT->LMMSE->CLAHE pipeline)"),
         ]
         for i, (k, v) in enumerate(morpho):
             pdf.kv_row(k, v, shade=(i % 2 == 0))
@@ -700,7 +700,7 @@ def generate_html_clinical_report(
             ("Lesion Perimeter", f"{perim:.1f} px" if area > 0 else "N/A"),
             ("Centroid (X, Y)", str(centroid) if centroid else "N/A"),
             ("Bounding Box (XYXY)", str(bbox) if bbox else "N/A"),
-            ("CNR Enhancement", f"+{cnr:.1f}%"),
+            ("CNR Enhancement", f"{cnr:+.1f}%"),
         ]
     )
     prec_items  = "".join(f"<li>{p}</li>" for p in counseling["precautions"])
@@ -798,7 +798,7 @@ def generate_html_clinical_report(
   <div class="sh">4. Visual Examination &mdash; Diagnostic Quad-Panel</div>
   <div class="quad-grid">
     <div class="quad-card"><div class="quad-label">1. Raw MRI Input</div><img src="{img_raw}"><div class="quad-cap">Original acquisition</div></div>
-    <div class="quad-card"><div class="quad-label">2. WPT&rarr;LMMSE&rarr;CLAHE Enhanced</div><img src="{img_enh}"><div class="quad-cap">+44% CNR gain</div></div>
+    <div class="quad-card"><div class="quad-label">2. WPT&rarr;LMMSE&rarr;CLAHE Enhanced</div><img src="{img_enh}"><div class="quad-cap">{cnr:+.1f}% CNR gain</div></div>
     <div class="quad-card"><div class="quad-label">3. U-Net Lesion Segmentation</div><img src="{img_seg}"><div class="quad-cap">Crimson tumour RoI / yellow contour</div></div>
     <div class="quad-card"><div class="quad-label">4. Grad-CAM XAI Attribution</div><img src="{img_gcam}"><div class="quad-cap">Model attention heatmap</div></div>
   </div>

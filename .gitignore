@@ -74,6 +74,7 @@ runs/
 .Trashes
 ehthumbs.db
 Thumbs.db
+desktop.ini
 
 # Security & Credentials (STRICT DENYLIST)
 kaggle.json
@@ -86,3 +87,6 @@ kaggle.json
 credentials.json
 client_secret*.json
 *.log
+data/desktop.ini
+datasets/desktop.ini
+desktop.ini

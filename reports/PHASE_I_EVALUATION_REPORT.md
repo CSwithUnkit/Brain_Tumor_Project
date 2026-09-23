@@ -3,7 +3,7 @@
 ### An Explainable Deep Learning Framework for Brain Tumor Segmentation and Classification
 
 > **Institution:** ITS Engineering College, AKTU  
-> **Generated:** 2026-09-19 09:12 UTC  
+> **Generated:** 2026-09-23 07:26 UTC  
 > **Dataset:** BRISC 2025 (6,000 classification + 4,793 segmentation pairs)
 
 
@@ -29,7 +29,7 @@ versus images pre-processed with the WPT→LMMSE→CLAHE enhancement pipeline (E
 | Optimizer | AdamW (lr=1e-4, wd=1e-4) |
 | Scheduler | ReduceLROnPlateau (patience=5, factor=0.5) |
 | Training Pairs | 25 epochs recorded |
-| **Best Val Dice** | **0.8724** |
+| **Best Val Dice** | **0.8806** |
 
 ![U-Net Convergence](figures/unet_dice_convergence.png)
 
