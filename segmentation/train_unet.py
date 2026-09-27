@@ -23,9 +23,9 @@ from data.dataset_preprocessor import (
 
 from segmentation.unet_model import UNet
 from segmentation.metrics import (
-    CombinedBCEDiceLoss, TverskyFocalLoss,
+    TverskyFocalLoss,
     compute_dice_coefficient, compute_iou_score,
-    compute_precision_recall, compute_hausdorff_distance
+    compute_hausdorff_distance
 )
 from utils.device_config import get_system_execution_profile, atomic_torch_save, atomic_json_save
 
@@ -112,23 +112,23 @@ def main():
 
     logger.info(f"ℹ️ [INFO] Loaded {len(seg_pairs)} segmentation pairs for training.")
 
-    # --input_type enhanced must ACTUALLY train on enhanced cached images
-    # (previously the flag only changed the checkpoint filename — the model
-    # silently trained on raw images while claiming to be "enhanced").
+    # --input_type enhanced must ACTUALLY train on enhanced cached images.
+    # Fail-hard on a cache miss: silently falling back to RAW images while
+    # the checkpoint is labeled "enhanced" would publish mislabeled science.
     if args.input_type == 'enhanced':
         cache_dir = 'data/cached_enhanced'
-        missing_cache = 0
-        for pair in seg_pairs:
-            cached = find_cached_enhanced(pair['image_path'], cache_dir)
-            if cached:
-                pair['image_path'] = cached
-            else:
-                missing_cache += 1
-        if missing_cache > 0:
-            logger.warning(
-                f"⚠️ [WARN] {missing_cache} image(s) missing from {cache_dir}; "
-                "falling back to raw paths for those entries."
+        missing = [pair['image_path'] for pair in seg_pairs
+                   if not find_cached_enhanced(pair['image_path'], cache_dir)]
+        if missing:
+            raise FileNotFoundError(
+                f"{len(missing)} image(s) have no entry in {cache_dir} "
+                f"(e.g. {missing[0]}). --input_type enhanced must train on "
+                f"WPT→LMMSE→CLAHE images — rebuild the cache first "
+                f"(scripts/rerun_full_pipeline.py stage 'cache'). Refusing to "
+                f"train an 'enhanced' U-Net on raw images."
             )
+        for pair in seg_pairs:
+            pair['image_path'] = find_cached_enhanced(pair['image_path'], cache_dir)
 
     # Stratified 70/15/15 train/val/test split (segmentation pairs carry no
     # class label, so this falls back to an unstratified shuffle split).

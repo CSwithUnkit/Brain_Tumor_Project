@@ -1,6 +1,7 @@
 import torch
 import logging
-from typing import Tuple
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,33 @@ def apply_hard_mask(image: torch.Tensor, mask_prob: torch.Tensor,
         DeprecationWarning, stacklevel=2,
     )
     return apply_soft_context_mask(image, mask_prob)
+
+def apply_exp3_guidance_numpy(enh_rgb: np.ndarray, mask_prob: np.ndarray,
+                              mean: np.ndarray, std: np.ndarray) -> np.ndarray:
+    """
+    NumPy twin of :func:`apply_exp3_guidance` for single-image inference
+    (dashboard). MUST stay numerically identical to the torch training path:
+
+      - guidance applied in NORMALIZED space, not uint8 space
+      - 50px empty-mask guard: masks with < 50 active pixels pass through
+        unmasked (a healthy scan is never darkened)
+
+    Args:
+        enh_rgb:   (H, W, 3) uint8 enhanced image
+        mask_prob: (H, W) float sigmoid mask from the U-Net (same input space)
+        mean/std:  (3,) ImageNet normalization constants
+
+    Returns:
+        (1, C, H, W) float32 normalized tensor, ready for the classifier.
+    """
+    cls_f = enh_rgb.astype(np.float32) / 255.0
+    cls_norm = (cls_f - mean) / std                                # (H, W, C)
+    area = int((mask_prob > 0.5).sum())
+    if area >= 50:
+        w = 0.40 + 0.60 * mask_prob                               # (H, W)
+        cls_norm = cls_norm * w[..., None]
+    return np.ascontiguousarray(cls_norm.transpose(2, 0, 1))[None].astype(np.float32)
+
 
 def apply_soft_mask(image: torch.Tensor, mask_prob: torch.Tensor, gamma: float = 0.4) -> torch.Tensor:
     """

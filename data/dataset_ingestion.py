@@ -32,9 +32,19 @@ class DatasetIngestor:
         brisc_data = {'classification': [], 'segmentation': []}
         
         # 1. High-Speed Classification Mapping (case-insensitive, multi-extension)
+        # M5: rglob() order is filesystem-dependent -> sort for cross-machine
+        # reproducible splits (split_dataset uses a fixed random_state).
+        # M7: dedup by resolved path — on case-insensitive filesystems
+        # (macOS/Windows) "*.jpg"+"*.JPG" match the same file twice, which
+        # could leak one copy into train and another into test.
+        seen: set = set()
         for class_name in self.brisc_classes:
             for ext in ("*.jpg", "*.JPG", "*.jpeg", "*.JPEG", "*.png", "*.PNG"):
-                for img_path in self.brisc_dir.rglob(f'**/{class_name}/{ext}'):
+                for img_path in sorted(self.brisc_dir.rglob(f'**/{class_name}/{ext}')):
+                    resolved = img_path.resolve()
+                    if resolved in seen:
+                        continue
+                    seen.add(resolved)
                     brisc_data['classification'].append({
                         'path': self._to_rel(img_path),
                         'class': class_name
@@ -42,12 +52,23 @@ class DatasetIngestor:
 
         # 2. High-Speed Segmentation Mapping
         # Map images directly by stem
-        image_paths = [p for ext in ("*.jpg", "*.JPG", "*.jpeg", "*.JPEG", "*.png", "*.PNG")
-                       for p in self.brisc_dir.rglob(f'**/segmentation_task/**/images/{ext}')]
+        image_paths = sorted(
+            p for ext in ("*.jpg", "*.JPG", "*.jpeg", "*.JPEG", "*.png", "*.PNG")
+            for p in self.brisc_dir.rglob(f'**/segmentation_task/**/images/{ext}')
+        )
+        # M6: masks are indexed by stem; two different masks sharing a stem
+        # (e.g. in nested folders) would previously pair silently with the
+        # wrong image. Fail loudly instead of corrupting supervision.
         mask_paths = {}
         for ext in ("*.png", "*.PNG", "*.jpg", "*.JPG"):
-            for p in self.brisc_dir.rglob(f'**/segmentation_task/**/masks/{ext}'):
-                mask_paths.setdefault(p.stem.replace('_mask', ''), p)
+            for p in sorted(self.brisc_dir.rglob(f'**/segmentation_task/**/masks/{ext}')):
+                key = p.stem.replace('_mask', '')
+                if key in mask_paths and mask_paths[key].resolve() != p.resolve():
+                    raise RuntimeError(
+                        f"Duplicate mask stem '{key}': {mask_paths[key]} vs {p}. "
+                        "Cannot pair image<->mask safely."
+                    )
+                mask_paths.setdefault(key, p)
 
         for img_path in image_paths:
             stem = img_path.stem

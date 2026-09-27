@@ -79,8 +79,11 @@ def find_cached_enhanced(image_path: str, cache_dir: str = 'data/cached_enhanced
     """
     Resolve an EXISTING cache entry for a raw image path.
 
-    Checks the structured layout first, then the legacy flat basename layout
-    (for caches written by older code). Returns None if not cached.
+    Only the structured layout (mirroring data/brisc/…) is trusted. The legacy
+    flat basename layout is deliberately NOT consulted: flat caches are known
+    to collide across classes (glioma/img_001.jpg vs meningioma/img_001.jpg),
+    so a flat hit could silently return the WRONG class's image. Rebuild the
+    cache with the structured writer if entries are missing.
     """
     p = image_path.replace('\\', '/')
     idx = p.find('data/brisc/')
@@ -89,9 +92,6 @@ def find_cached_enhanced(image_path: str, cache_dir: str = 'data/cached_enhanced
         candidate = os.path.join(cache_dir, rel)
         if os.path.exists(candidate):
             return candidate
-    legacy = os.path.join(cache_dir, os.path.basename(image_path))
-    if os.path.exists(legacy):
-        return legacy
     return None
 
 

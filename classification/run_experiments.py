@@ -27,6 +27,31 @@ from utils.device_config import get_system_execution_profile, atomic_torch_save,
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 logger = logging.getLogger(__name__)
 
+def load_unet_for_exp3(unet_ckpt: str, device) -> torch.nn.Module:
+    """
+    Load the trained U-Net for Exp3 segmentation-guided masking.
+
+    CRITICAL (fail-hard): a missing checkpoint used to only log a warning and
+    train on UNMASKED images while still saving exp3_* outputs — silently
+    publishing a "seg-guided" experiment that never saw a mask. Refuse
+    instead of producing mislabeled science.
+    """
+    if not os.path.exists(unet_ckpt):
+        raise FileNotFoundError(
+            f"Exp3 requires a trained U-Net for segmentation-guided masking, "
+            f"but no checkpoint was found at {unet_ckpt}. Train the U-Net first "
+            f"(python -m segmentation.train_unet) or pass --unet_checkpoint "
+            f"explicitly."
+        )
+    from segmentation.unet_model import UNet
+    unet_model = UNet(n_channels=3, n_classes=1).to(device)
+    unet_model.load_state_dict(
+        torch.load(unet_ckpt, map_location=device, weights_only=True)
+    )
+    unet_model.eval()
+    return unet_model
+
+
 def apply_exp3_guidance(images: torch.Tensor, unet_model: torch.nn.Module,
                         soft: bool = False) -> torch.Tensor:
     """
@@ -154,22 +179,23 @@ def main():
         raise FileNotFoundError("0 classification images found. Please re-run python -m data.dataset_ingestion")
 
     # If Exp 2 or Exp 3, prefer enhanced cached images.
-    # Resolved via find_cached_enhanced: structured layout first, legacy flat
-    # basename fallback. Warn (but keep original path) if cache entry is missing.
+    # Fail-hard on a cache miss: silently falling back to RAW images while
+    # the experiment is labeled "enhanced"/"seg-guided" would publish
+    # mislabeled science (same fail-open class as the old Exp3/PMRAM bugs).
     if args.experiment in ['exp2_enhanced', 'exp3_seg_guided', 'exp3_soft_masked']:
         cache_dir = 'data/cached_enhanced'
-        missing_cache = 0
-        for rec in all_records:
-            cached = find_cached_enhanced(rec['path'], cache_dir)
-            if cached:
-                rec['path'] = cached
-            else:
-                missing_cache += 1
-        if missing_cache > 0:
-            logger.warning(
-                f"⚠️ [WARN] {missing_cache} image(s) not found in {cache_dir}; "
-                "falling back to raw image paths for those entries."
+        missing = [rec['path'] for rec in all_records
+                   if not find_cached_enhanced(rec['path'], cache_dir)]
+        if missing:
+            raise FileNotFoundError(
+                f"{len(missing)} image(s) have no entry in {cache_dir} "
+                f"(e.g. {missing[0]}). {args.experiment} must train on "
+                f"WPT→LMMSE→CLAHE enhanced images — rebuild the cache first "
+                f"(scripts/rerun_full_pipeline.py stage 'cache'). Refusing to "
+                f"train an 'enhanced' experiment on raw images."
             )
+        for rec in all_records:
+            rec['path'] = find_cached_enhanced(rec['path'], cache_dir)
 
     # Stratified 70/15/15 train/val/test split (reuses the shared helper so
     # every training script splits identically). The test set is NEVER used
@@ -217,19 +243,8 @@ def main():
     unet_model: Optional[torch.nn.Module] = None
     if args.experiment in ('exp3_seg_guided', 'exp3_soft_masked'):
         unet_ckpt = args.unet_checkpoint or 'checkpoints/unet/best_unet_enhanced.pth'
-        if os.path.exists(unet_ckpt):
-            from segmentation.unet_model import UNet
-            unet_model = UNet(n_channels=3, n_classes=1).to(device)
-            unet_model.load_state_dict(
-                torch.load(unet_ckpt, map_location=device, weights_only=True)
-            )
-            unet_model.eval()
-            logger.info(f"ℹ️ [INFO] Exp3: U-Net loaded from {unet_ckpt} (soft_mask={use_soft_mask})")
-        else:
-            logger.warning(
-                f"⚠️ [WARN] Exp3: U-Net checkpoint not found at {unet_ckpt}. "
-                "Training will proceed without segmentation masking."
-            )
+        unet_model = load_unet_for_exp3(unet_ckpt, device)
+        logger.info(f"ℹ️ [INFO] Exp3: U-Net loaded from {unet_ckpt} (soft_mask={use_soft_mask})")
     
     for epoch in range(1, args.epochs + 1):
         if epoch == WARMUP_EPOCHS + 1:
