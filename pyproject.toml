@@ -50,6 +50,8 @@ ignore = [
 # cells (F401), and trailing whitespace inside markdown-flavoured cells
 # (W291/W293) is harmless. The .py mirrors inherit the same treatment.
 "notebooks/*" = ["F401", "B905", "W291", "W293", "E402", "I001"]
+# The Colab training notebook is the same kind of interactive document.
+"colab/*" = ["F401", "B905", "W291", "W293", "E402", "I001"]
 # These files embed Markdown templates as strings, where a trailing
 # double-space is an intentional hard line-break — not stray whitespace.
 "evaluation/consolidate_reports.py" = ["W291", "W293"]

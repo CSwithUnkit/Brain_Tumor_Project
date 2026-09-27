@@ -81,8 +81,8 @@ def preflight(full_mode):
         if not meta.exists():
             raise FileNotFoundError(
                 "data/brisc/brisc_metadata.json not found.\n"
-                "Download + ingest the datasets first:\n"
-                "  BRISC_KAGGLE_ID=<id> PMRAM_KAGGLE_ID=<id> python -m data.download_datasets\n"
+                "Download + ingest the datasets first (no login needed):\n"
+                "  python -m data.download_datasets\n"
                 "  python -m data.dataset_ingestion"
             )
         if not torch.cuda.is_available():

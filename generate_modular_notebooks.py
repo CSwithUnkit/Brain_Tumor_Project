@@ -137,62 +137,30 @@ print(f"✅ All dependencies installed successfully")""",
         ),
         (
             "code",
-            """# ── Cell 3: Kaggle API Configuration ────────────────────────────────────────
-import os, shutil, json
-
-KAGGLE_DIR = os.path.expanduser("~/.kaggle")
-KAGGLE_JSON = os.path.join(KAGGLE_DIR, "kaggle.json")
-os.makedirs(KAGGLE_DIR, exist_ok=True)
-
-local_kaggle = "kaggle.json"
-if os.path.exists(local_kaggle):
-    shutil.copy(local_kaggle, KAGGLE_JSON)
-    os.chmod(KAGGLE_JSON, 0o600)
-    with open(KAGGLE_JSON) as f:
-        creds = json.load(f)
-    print(f"✅ Kaggle API configured for user: {creds.get('username', 'unknown')}")
-else:
-    print("⚠️  kaggle.json not found in project root.")
-    print("   Upload it manually or place it at: kaggle.json")
-    print("   Get yours from: https://www.kaggle.com/settings → API → Create New Token")""",
+            """# ── Cell 3: Dataset sources (no login needed) ─────────────────────────────────
+# BRISC  -> Zenodo  (6000 classification images + 4793 segmentation pairs)
+# PMRAM  -> Mendeley Data, "Raw Data" (1600 original images; augmented
+#           derivatives are deliberately excluded from validation)
+# Dono sources anonymous download allow karte hain — koi Kaggle account,
+# koi API token nahi chahiye. Agli cell download + verify karegi.
+print("✅ No API keys needed — datasets download anonymously.")""",
         ),
         (
             "code",
-            """# ── Cell 4: Dataset Download & Extraction ───────────────────────────────────
-import os
+            """# ── Cell 4: Dataset Download & Extraction (verified, resumable) ──────────────
+# data/download_datasets.py use hota hai:
+#  - pure-Python download (Windows/macOS/Linux/Colab — curl/unzip nahi chahiye)
+#  - tooti connection par resume + retry (flaky networks ke liye)
+#  - har step verify hota hai: archive size, phir extracted image counts.
+#    Kuch bhi adhura raha to LOUD error aayega — fake "✅ downloaded" kabhi nahi.
+from data.download_datasets import ensure_brisc, ensure_pmram
 
-# ─── BRISC Dataset ───
-# Replace the dataset ID below with your actual Kaggle BRISC dataset slug
-BRISC_DATASET_ID = "your-username/brisc-brain-tumor-dataset"  # ← UPDATE THIS
-PMRAM_DATASET_ID = "your-username/pmram-brain-mri"            # ← UPDATE THIS
+brisc_stats = ensure_brisc()
+print(f"✅ BRISC ready: {brisc_stats['classification']:,} classification images, "
+      f"{brisc_stats['segmentation_pairs']:,} segmentation pairs")
 
-if not os.path.exists("data/brisc/brisc2025"):
-    print("Downloading BRISC dataset...")
-    os.makedirs("data/brisc", exist_ok=True)
-    os.system(f"kaggle datasets download -d {BRISC_DATASET_ID} -p data/brisc --unzip -q")
-    print("✅ BRISC downloaded and extracted")
-else:
-    print("✅ BRISC already present — skipping download")
-
-if not os.path.exists("data/pmram"):
-    print("Downloading PMRAM dataset...")
-    os.makedirs("data/pmram", exist_ok=True)
-    os.system(f"kaggle datasets download -d {PMRAM_DATASET_ID} -p data/pmram --unzip -q")
-    print("✅ PMRAM downloaded and extracted")
-else:
-    print("✅ PMRAM already present — skipping download")
-
-# Verify structure
-import glob
-dirs = [d for d in glob.glob("data/brisc/*/*") if os.path.isdir(d)]
-print("\\nBRISC directory structure:")
-if dirs:
-    for d in dirs[:15]:
-        print(d.replace(os.sep, "/"))
-    if len(dirs) > 15:
-        print(f"... and {len(dirs) - 15} more directories.")
-else:
-    print("  (empty — check dataset ID above)")""",
+pmram_stats = ensure_pmram()
+print(f"✅ PMRAM ready: {pmram_stats['original']:,} original images {pmram_stats['folders']}")""",
         ),
         (
             "code",
@@ -204,15 +172,22 @@ t0 = time.time()
 
 # Run ingestion module
 import subprocess, sys
+# NOTE (Windows fix): child ko PYTHONUTF8=1 diya jata hai taaki uske emoji
+# logs UTF-8 me aayein, aur parent errors="replace" ke saath decode karta hai.
+# Iske bina Windows par cp1252 UnicodeDecodeError aata tha aur asli error chhup
+# jata tha. stderr guard bhi hai taaki error-handler khud crash na kare.
+import os
+_child_env = dict(os.environ, PYTHONUTF8="1")
 result = subprocess.run(
     [sys.executable, "-m", "data.dataset_ingestion"],
-    capture_output=True, text=True
+    capture_output=True, text=True, encoding="utf-8", errors="replace",
+    env=_child_env,
 )
 elapsed = time.time() - t0
 
 print(result.stdout)
 if result.returncode != 0:
-    print("⚠️  STDERR:", result.stderr[-2000:])
+    print("⚠️  STDERR:", (result.stderr or "")[-2000:])
     raise RuntimeError("dataset_ingestion failed — check dataset paths above")
 
 print(f"⏱  Completed in {elapsed:.1f}s")
