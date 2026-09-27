@@ -854,7 +854,7 @@ else:
     _hw_label = "CPU"
     _hw_sub   = f"{_p['total_ram_gb']:.1f} GB RAM · {_p['num_workers']} workers"
     _hw_color = "#0891B2"
-_ort_badge = ("ORT ✓" if _ORT_AVAILABLE else "PyTorch")
+_ort_badge = "PyTorch"
 st.sidebar.markdown(
     f'<span style="font-size:13px;color:{_hw_color};font-weight:600;font-family:Noto Sans,sans-serif">{_hw_label}</span><br>'
     f'<span style="font-size:12px;color:#64748B;font-family:Noto Sans,sans-serif">{_hw_sub} · {_ort_badge}</span>',
