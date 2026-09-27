@@ -32,13 +32,17 @@ source: `checkpoints/unet/unet_training_history_enhanced.json`
 (agrees with `reports/PHASE_I_EVALUATION_REPORT.md`; the previously quoted 0.8724 was stale/incorrect).
 
 **External Validation (PMRAM, N=1,505):** Accuracy 91.23%, Macro F1 91.08%, Gen Gap −3.23%
-— source: `results/pmram_external_validation.json`. The stored BRISC reference (88.00%
-acc) matches Exp 3's best val epoch, not the Exp 1 baseline; checkpoint provenance
-for the PMRAM run is not recorded — treat as indicative.
+— ⚠️ **INVALID, do not cite.** This run evaluated an enhanced-trained model on
+*raw* images (wrong input distribution — audit finding C1, fixed 2026-09-27),
+used a mismatched BRISC reference (Exp 3's 88.00% val epoch instead of the
+model's own baseline), and recorded no checkpoint provenance. The stored file
+`results/pmram_external_validation.json` has been deleted; re-run
+`python -m validation.external_pmram` after the fix for a valid number.
 
 ## Per-Class Breakdown & Confusion Matrix Tables
 
-*(Extracted directly from results/metrics_exp2_enhanced.json and results/pmram_external_validation.json).*
+*(Extracted directly from results/metrics_exp2_enhanced.json. The PMRAM table below is retained
+for historical reference only — see the ⚠️ INVALID note above; its source file has been deleted.)*
 
 ## Clinical Utility Summary
 

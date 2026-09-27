@@ -68,6 +68,13 @@ ground-truth U-Net segmentation masks using pixel-level IoU and Dice metrics.
 
 ## 3. External Generalization — PMRAM Validation
 
+> ⚠️ **INVALID (audit C1, 2026-09-27):** the 91.23% below was measured by
+> evaluating an *enhanced-trained* model on *raw* images (wrong input
+> distribution), against a mismatched BRISC reference, with no checkpoint
+> provenance. The source file `results/pmram_external_validation.json` has
+> been deleted. Re-run `python -m validation.external_pmram` post-fix for a
+> valid number. This section is retained as a historical record only.
+
 Zero-retraining inference was performed on the PMRAM dataset (**1,505** usable,
 non-augmented brain MRI scans found by folder walk — not 1,600 as previously
 stated) to assess cross-dataset generalization. Source:

@@ -27,7 +27,7 @@ pinned: false
    - Exp 2: Enhanced (98.22% — did not beat the raw baseline in recorded runs)
    - Exp 3: Segmentation-Guided attention ⚠️ (88.33% — pre-fix numbers; masking ran in training but not validation, fixed 2026-09-27, re-run required)
 4. **Explainability:** Grad-CAM feature attribution on `features[-1]` combined with quantitative IoU spatial localization analysis.
-5. **External Generalization:** Zero-retraining PMRAM validation on 1,505 usable scans (see `results/pmram_external_validation.json`) to measure clinical generalization. BRISC reference stored alongside is Exp 3's best val epoch (88.00%), not the Exp 1 baseline — see `reports/PHASE_II_FINAL_REPORT.md` §3.
+5. **External Generalization:** Zero-retraining PMRAM validation on 1,505 usable scans to measure clinical generalization. ⚠️ The previously stored result (91.23%) was invalid — it evaluated an enhanced-trained model on raw images (wrong distribution, audit C1) — and `results/pmram_external_validation.json` has been deleted. Re-run `python -m validation.external_pmram` (now with distribution-matched preprocessing + checkpoint provenance) for a valid number.
 
 ---
 

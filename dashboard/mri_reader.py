@@ -71,6 +71,9 @@ def _apply_dicom_windowing(ds, arr: np.ndarray) -> np.ndarray:
 
     def _first(v):
         # WindowCenter/Width may be multi-valued; use the first.
+        # Deliberate two-attempt parse: indexed access first, plain float()
+        # as fallback for scalar tags. A genuinely malformed tag raises here
+        # (loud) instead of silently picking a wrong window.
         try:
             return float(v[0] if len(v) > 1 else v)
         except Exception:
@@ -143,10 +146,12 @@ def _read_nifti(data: bytes, filename: str) -> dict:
             os.unlink(tmp)
         except OSError:
             pass
+    # Voxel spacing is informational only (we never convert px→mm);
+    # missing/malformed headers must not reject a readable scan.
     try:
         spacing = tuple(float(x) for x in img.header.get_zooms())
     except Exception:
-        spacing = None
+        spacing = None  # deliberate: spacing is optional metadata
 
     if arr.ndim == 4:
         arr = arr[..., arr.shape[3] // 2]  # middle timepoint

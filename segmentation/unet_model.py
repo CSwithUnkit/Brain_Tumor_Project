@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Optional
 
 class DoubleConv(nn.Module):
     """(Conv2d(3x3) -> BatchNorm2d -> ReLU) x 2"""

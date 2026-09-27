@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from torchvision.models import efficientnet_b2, EfficientNet_B2_Weights
-from typing import Optional
 
 class BrainTumorClassifier(nn.Module):
     """

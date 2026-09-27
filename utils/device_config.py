@@ -21,7 +21,6 @@ Usage
 """
 
 import os
-import sys
 
 import psutil
 import torch
