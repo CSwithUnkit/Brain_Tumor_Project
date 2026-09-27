@@ -400,7 +400,7 @@ def render_guidance(pred_class: str) -> None:
         st.markdown("**3 · Recommended workup**")
         for s in info['next_steps']:
             st.markdown(f"- {s}")
-        st.markdown("**4 · Consultation checklist**")
+        st.markdown("**4 · Questions for your doctor**")
         for i, item in enumerate(info['checklist']):
             st.checkbox(item, key=f"guidance_{pred_class}_{i}")
 

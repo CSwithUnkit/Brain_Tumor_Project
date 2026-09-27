@@ -8,7 +8,7 @@ Uses fpdf2 (pure-Python, no LaTeX) to produce an A4-format diagnostic PDF with:
   2. 2x2 visual quad-panel (Raw / Enhanced / Segmentation / Grad-CAM)
   3. Confidence table + morphometric biomarkers
   4. Neuro-oncological counseling sections (Pathological Impression,
-     Patient Precautions, Diagnostic Workup, Physician Checklist)
+     Patient Precautions, Diagnostic Workup, Questions-for-Your-Doctor Checklist)
   5. AI medical disclaimer + radiologist signature block
 
 Entry point:
@@ -45,11 +45,11 @@ COUNSELING_DB: dict = {
             "Gliomas arise from glial progenitor cells and demonstrate varying degrees of invasion "
             "along white matter tracts. WHO grading (I-IV) is determined by histology and molecular "
             "markers. High-grade variants require prompt neuro-oncology referral; prognosis is "
-            "determined by histology and molecular markers, which the treating team will explain."
+            "determined by histology and molecular markers, which the treating team will explain. Only tissue diagnosis can confirm the exact type and grade."
         ),
         "precautions": [
-            "Seizure precautions: avoid driving, operating heavy machinery, or unsupervised swimming; "
-            "ask the neurologist whether an emergency seizure-medication plan is needed.",
+            "Ask your doctor about safety precautions if seizures are a concern (including driving "
+            "and swimming); also ask whether an emergency seizure-medication plan is needed.",
             "Monitor for raised intracranial pressure (ICP) symptoms: early-morning headache that "
             "worsens on Valsalva, projectile vomiting, papilledema, or progressive focal neurological deficit.",
             "Avoid significant head trauma; use helmet during activities with fall risk.",
@@ -59,7 +59,8 @@ COUNSELING_DB: dict = {
             "and do not stop suddenly -- discuss monitoring with the treating doctor.",
         ],
         "next_steps": [
-            "MR Spectroscopy: Evaluate Choline/NAA ratio (elevated Cho:NAA > 2 supports high-grade glioma).",
+            "Your doctor may order advanced MRI techniques (such as MR spectroscopy) "
+            "to characterize the lesion further.",
             "Thin-slice 3D T1 contrast-enhanced MRI (1mm isotropic MPRAGE) for surgical planning.",
             "Stereotactic neuro-navigation biopsy or maximal safe surgical resection consultation.",
             "Molecular panel (tissue): IDH1/IDH2 mutation status, 1p/19q codeletion, "
@@ -69,14 +70,14 @@ COUNSELING_DB: dict = {
             "Radiation Oncology and Medical Oncology (neuro-oncology) multidisciplinary tumour board review.",
         ],
         "checklist": [
-            "Discussed diagnosis and WHO grade uncertainty pending tissue biopsy with patient/family.",
-            "Seizure precautions counselled; anticonvulsant prescription issued if indicated.",
-            "Corticosteroid use for symptomatic swelling discussed with the team (if applicable).",
-            "Neurosurgery referral placed for stereotactic biopsy/resection.",
-            "Molecular testing panel ordered.",
-            "Multidisciplinary tumour board (MDT) referral submitted.",
-            "Follow-up MRI date scheduled (typically 6-8 weeks post-op or per MDT guidance).",
-            "Palliative care / psycho-oncology referral offered.",
+            "Ask your doctor to explain the finding and why a biopsy is needed to confirm the grade.",
+            "Ask about seizure precautions and whether any preventive medication is needed.",
+            "Ask whether medication for brain swelling is needed in your case.",
+            "Ask whether a neurosurgery referral for biopsy or surgery is needed.",
+            "Ask whether molecular testing of the tissue will be done.",
+            "Ask whether your case will be reviewed by a multidisciplinary tumor board.",
+            "Ask when your follow-up MRI should be scheduled.",
+            "Ask about support services (palliative care, counseling) available to you.",
         ],
     },
     "Extra-axial Dural Lesion": {
@@ -85,15 +86,14 @@ COUNSELING_DB: dict = {
             "(WHO Grade I). Meningiomas are among the most common primary CNS tumours. WHO Grade II (atypical) "
             "and Grade III (anaplastic) variants have higher recurrence rates. They may cause symptoms "
             "via mass effect on adjacent brain, cranial nerves, or dural venous sinuses. The characteristic "
-            "MRI appearance is a homogeneously enhancing extra-axial mass with a 'dural tail' sign."
+            "MRI appearance is a homogeneously enhancing extra-axial mass with a 'dural tail' sign. The exact type and grade can only be confirmed by tissue diagnosis."
         ),
         "precautions": [
             "Monitor for cranial nerve compression: sudden visual field changes (chiasmal compression), "
             "diplopia, facial numbness, or hearing loss -- present to emergency if acute.",
-            "Avoid vigorous neck manipulation (chiropractic, high-impact sports with neck rotation) "
-            "if tumour is in the skull base or cavernous sinus region.",
+            "Ask your neurosurgeon about any activity restrictions related to the tumor's location.",
             "Report any new-onset focal motor deficit, word-finding difficulty, or sudden severe headache.",
-            "Anticonvulsants are NOT routinely indicated for meningioma unless seizures have occurred.",
+            "Your doctor will decide whether any seizure-related medication is needed in your case.",
             "If on anticoagulation for other conditions, discuss with neurosurgeon before any procedural "
             "intervention given vascular supply of meningioma from external carotid branches.",
         ],
@@ -105,19 +105,18 @@ COUNSELING_DB: dict = {
             "Formal ophthalmology / neuro-ophthalmology review if near optic nerve, chiasm, or cavernous sinus.",
             "Simpson Grade resection planning (neurosurgical consultation) -- Simpson Grade I/II associated "
             "with lowest recurrence.",
-            "Consider Stereotactic Radiosurgery (Gamma Knife / CyberKnife) if lesion is small (<3 cm), "
-            "in eloquent location, or unresectable (skull base, cavernous sinus).",
-            "Annual MRI surveillance for small, asymptomatic, incidentally discovered meningiomas.",
+            "Ask your specialist whether focused radiation treatment is an option if surgery is not suitable.",
+            "Your doctor will advise how often follow-up scans are needed.",
         ],
         "checklist": [
-            "Communicated benign vs atypical/anaplastic grade uncertainty pending post-op histology.",
-            "Cranial nerve examination performed and documented.",
-            "Ophthalmology referral placed if visual symptoms present.",
-            "Neurosurgery consulted for Simpson Grade resection or SRS suitability.",
-            "CT bone windows ordered to assess skull base involvement.",
-            "MR angiography requested if near major venous sinuses.",
-            "Surveillance MRI protocol discussed if 'wait and scan' approach adopted.",
-            "Patient education provided regarding symptom red flags requiring emergency review.",
+            "Ask your doctor to explain why the exact grade can only be confirmed after surgery.",
+            "Ask whether a cranial nerve examination has been done.",
+            "Ask whether an eye specialist review is needed for any visual symptoms.",
+            "Ask about neurosurgery options and whether focused radiation could be an alternative.",
+            "Ask whether a CT scan is needed to check bone involvement.",
+            "Ask whether blood-vessel imaging (MR angiography) is needed.",
+            "If 'wait and scan' is advised, ask how often follow-up scans will be done.",
+            "Make sure you know which symptoms need emergency care.",
         ],
     },
     "Sella Turcica Pituitary Adenoma": {
@@ -127,11 +126,11 @@ COUNSELING_DB: dict = {
             "Functional adenomas (secreting: prolactinoma, GH-secreting acromegaly, ACTH-secreting "
             "Cushing's disease) require endocrine therapy in addition to surgical/radiosurgical management. "
             "Non-functioning adenomas cause symptoms primarily via mass effect on the optic chiasm "
-            "(bitemporal hemianopia) and pituitary stalk compression."
+            "(bitemporal hemianopia) and pituitary stalk compression. The exact type is confirmed by tissue diagnosis and hormone testing."
         ),
         "precautions": [
-            "Urgent visual field assessment: bitemporal hemianopia (superior field defect first) "
-            "indicates chiasmal compression -- this is a surgical urgency.",
+            "New vision changes (such as loss of side vision) need prompt medical assessment -- "
+            "contact your doctor or eye specialist urgently.",
             "Watch for adrenal crisis symptoms: severe fatigue, dizziness, hypotension, nausea, "
             "hypoglycemia -- especially post-surgical or with concurrent illness (sick-day rules).",
             "Tell the doctor about all medicines being taken -- some can affect prolactin levels; "
@@ -148,53 +147,54 @@ COUNSELING_DB: dict = {
             "(8 AM), Growth Hormone (GH), IGF-1, TSH, Free T4, LH, FSH, Testosterone/Oestradiol.",
             "Dedicated pituitary MRI protocol: coronal 3mm T1 pre/post gadolinium + dynamic sequence "
             "(if not already performed) for precise delineation of adenoma vs normal gland.",
-            "Endocrine / Endocrinology consultation for functional adenoma management "
-            "(dopamine agonist for prolactinoma; somatostatin analogue for acromegaly).",
+            "If the adenoma secretes hormones, your endocrinologist will discuss medication options with you.",
             "Endoscopic Transsphenoidal Surgery (ETS) consultation for macroadenomas with "
             "chiasmal compression or functional adenomas refractory to medical therapy.",
             "Post-operative cortisol and pituitary function assessment (Day 1 morning cortisol) if surgery performed.",
         ],
         "checklist": [
-            "Visual field testing (Goldman/Humphrey) requested urgently if chiasmal compression suspected.",
-            "Full anterior pituitary hormone panel ordered.",
-            "Ophthalmology referral placed for formal perimetry.",
-            "Endocrinology consultation requested.",
-            "Transsphenoidal surgery consultation placed for macroadenoma with visual compromise.",
-            "Hydrocortisone stress dosing protocol explained to patient (sick-day rules).",
-            "Patient advised re: pituitary apoplexy warning symptoms.",
-            "Medical therapy options for prolactinoma discussed with Endocrinology (if appropriate).",
+            "Ask whether urgent visual field testing is needed.",
+            "Ask whether a full pituitary hormone blood panel will be done.",
+            "Ask whether an eye specialist referral is needed.",
+            "Ask whether a hormone specialist (endocrinology) review is needed.",
+            "Ask whether a surgical consultation is needed, especially if vision is affected.",
+            "If you take hydrocortisone, ask your doctor to explain sick-day rules.",
+            "Make sure you know the warning symptoms needing emergency care (sudden severe headache, vision loss).",
+            "Ask your endocrinologist about medication options if the adenoma secretes hormones.",
         ],
     },
     "No Tumor": {
         "pathological_nature": (
-            "Unremarkable cerebral parenchyma with normal ventricular symmetry, no focal mass effect, "
-            "no abnormal enhancement, and no evidence of midline shift. White matter signal is within "
-            "normal limits for age. No evidence of an intracranial neoplasm on this study."
+            "No focal tumor was detected by the AI on this scan. A negative AI result does not "
+            "rule out all abnormalities -- only a qualified radiologist reviewing the full study "
+            "can confirm a normal scan. Discuss any ongoing symptoms with your doctor."
         ),
         "precautions": [
-            "Reassure patient: no intracranial tumour identified on AI-assisted MRI analysis.",
+            "No tumor was flagged on this scan, but this does not guarantee absence of disease. "
+            "If symptoms persist or worsen, seek medical review.",
             "Evaluate non-neoplastic causes of presenting symptoms: tension headache, migraine (with aura), "
             "cervical spondylosis / cervicogenic headache, or age-related microvascular changes.",
             "Alert patient to 'red flag' headache symptoms warranting urgent re-imaging: thunderclap onset "
             "(SAH), progressive headache worsening over weeks, headache with fever/neck stiffness, "
             "or new neurological deficit.",
             "Consider vascular pathology if symptoms suggest: MR Angiography for suspected aneurysm or AVM.",
-            "Consider sensitive discussion and psychological evaluation if symptoms may have a functional component.",
+            "If headaches or neurological symptoms continue despite a normal scan, "
+            "your doctor can explore other causes with you.",
         ],
         "next_steps": [
-            "Clinical follow-up as symptoms dictate -- no urgent neurosurgical intervention required.",
+            "Your doctor will decide on follow-up and whether any urgent referral is needed.",
             "If headaches persist: Neurology referral for headache classification and pharmacological management.",
             "Cervical spine MRI if cervicogenic headache is suspected.",
             "EEG if seizure-like episodes reported.",
             "Consider ophthalmology review for visual symptoms (migraine equivalent, papilledema screening).",
         ],
         "checklist": [
-            "Patient reassured regarding absence of neoplastic pathology on this study.",
-            "Non-neoplastic differential diagnoses discussed.",
-            "Red-flag headache warning criteria explained.",
-            "Neurology referral offered if headaches are disabling or progressive.",
-            "Follow-up plan documented (clinical review vs re-imaging timeline).",
-            "GP / primary care physician informed of normal scan result.",
+            "Ask your doctor to confirm the scan looks normal to them as well.",
+            "Ask what else could explain your symptoms.",
+            "Make sure you know the red-flag symptoms that need an urgent re-check.",
+            "Ask whether a neurology referral would help if symptoms persist.",
+            "Ask what the follow-up plan is and when to come back.",
+            "Make sure your regular doctor receives this result.",
         ],
     },
 }
@@ -586,11 +586,11 @@ def generate_pdf_report(
             pdf.bullet(step, color=_ClinicalPDF.C_TEAL_D)
         pdf.ln(3)
 
-        # 6.4 Physician Checklist
+        # 6.4 Questions for your doctor
         pdf.set_font("Helvetica", "B", 8.5)
         pdf.set_text_color(*_ClinicalPDF.C_TEAL_D)
         pdf.set_x(10)
-        pdf.cell(0, 6, "6.4  Consultation Checklist", ln=True)
+        pdf.cell(0, 6, "6.4  Questions for Your Doctor", ln=True)
         for i, item in enumerate(counseling["checklist"], start=1):
             pdf.checklist_item(item, i)
         pdf.ln(4)
@@ -837,7 +837,7 @@ def generate_html_clinical_report(
   <p style="font-size:.75rem;font-weight:700;color:#7c3aed;margin:.8rem 0 .4rem">6.3 Recommended Confirmatory Diagnostic Workup</p>
   <ul>{steps_items}</ul>
 
-  <p style="font-size:.75rem;font-weight:700;color:#059669;margin:.8rem 0 .4rem">6.4 Attending Physician Consultation Checklist</p>
+  <p style="font-size:.75rem;font-weight:700;color:#059669;margin:.8rem 0 .4rem">6.4 Questions for Your Doctor</p>
   <ul style="list-style:none;padding-left:0">{check_items}</ul>
 
   <div class="sh">7. Medical Disclaimer &amp; Regulatory Status</div>
