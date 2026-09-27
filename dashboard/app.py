@@ -19,13 +19,6 @@ from typing import Tuple, Optional
 # Dynamic hardware profiler — works on CPU, CUDA, Google Colab, and Windows
 from utils.device_config import get_system_execution_profile
 
-# ONNX Runtime: optional soft-import for faster CPU inference
-try:
-    import onnxruntime as _ort
-    _ORT_AVAILABLE = True
-except ImportError:
-    _ORT_AVAILABLE = False
-
 # Detect hardware once at module load (Streamlit caches the module across reruns)
 _HW_PROFILE = get_system_execution_profile()
 
@@ -750,7 +743,9 @@ def calculate_biomarkers(mask, raw_img, enh_img):
     centroid = bbox = None
     perimeter = 0.0
     if pixels > 0:
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # .copy(): findContours mutates its input on some OpenCV builds;
+        # never let contour extraction corrupt the caller's mask.
+        contours, _ = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if contours:
             c = max(contours, key=cv2.contourArea)
             x, y, w, h = cv2.boundingRect(c)
@@ -888,42 +883,27 @@ st.markdown(f"""
 
 # ── Model loading ─────────────────────────────────────────────────────────────
 @st.cache_resource
-def load_models():
-    # Use the hardware profiler for device selection — respects VRAM constraints
-    # and is consistent with the training scripts.
+def load_models(active_pipeline: str):
+    # active_pipeline is a cache KEY: switching the sidebar model choice
+    # invalidates the cache and reloads the right classifier. Previously
+    # model_choice was read from the enclosing scope, so switching models
+    # silently kept serving the OLD classifier's predictions.
     profile = get_system_execution_profile()
     device  = profile["device"]
 
     unet        = UNet(n_channels=3, n_classes=1).to(device)
     classifier  = BrainTumorClassifier(num_classes=4, pretrained=False).to(device)
     seg_ckpt    = PROJECT_ROOT / 'checkpoints/unet/best_unet_enhanced.pth'
-    cls_ckpt    = PROJECT_ROOT / f'checkpoints/{model_map[model_choice]}'
+    cls_ckpt    = PROJECT_ROOT / f'checkpoints/{model_map[active_pipeline]}'
     if seg_ckpt.exists():
         unet.load_state_dict(torch.load(str(seg_ckpt), map_location=device, weights_only=True))
     if cls_ckpt.exists():
         classifier.load_state_dict(torch.load(str(cls_ckpt), map_location=device, weights_only=True))
     unet.eval(); classifier.eval()
 
-    # ── ONNX Runtime inference session (optional, faster CPU inference) ───────
-    # If an exported ONNX file exists alongside the .pth, ORT is used for the
-    # classifier forward pass. Falls back to PyTorch silently when ORT is absent
-    # or the .onnx file has not been generated yet.
-    cls_ort_path = PROJECT_ROOT / 'deployment/exported/classifier_exported.onnx'
-    ort_session: Optional[object] = None
-    if _ORT_AVAILABLE and cls_ort_path.exists():
-        try:
-            providers = (
-                ["CUDAExecutionProvider", "CPUExecutionProvider"]
-                if device.type == "cuda"
-                else ["CPUExecutionProvider"]
-            )
-            ort_session = _ort.InferenceSession(str(cls_ort_path), providers=providers)
-        except Exception:
-            ort_session = None  # ORT session failed — keep PyTorch fallback
+    return unet, classifier, device
 
-    return unet, classifier, device, ort_session
-
-unet, classifier, device, _ort_session = load_models()
+unet, classifier, device = load_models(model_choice)
 enhancer = EnhancementAblationManager()
 gradcam  = BrainTumorGradCAM(classifier, use_cuda=(device.type == 'cuda'))
 
@@ -1031,12 +1011,32 @@ if upload is not None:
                 overlay_seg[binary_mask > 0] * 0.55 +
                 np.array([255, 40, 80]) * 0.45
             ).clip(0, 255).astype(np.uint8)
-            contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            # .copy(): findContours mutates its input on some OpenCV builds
+            contours, _ = cv2.findContours(binary_mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             cv2.drawContours(overlay_seg, contours, -1, (255, 255, 0), 2)
 
-        # 5. Classify
+        # 5. Classify — the classifier input MUST match the training
+        # distribution of the selected experiment. Previously the classifier
+        # silently reused the UNet's enhanced-image tensor even for
+        # "Exp 1: Baseline" (trained on RAW images) — a silent distribution
+        # shift producing wrong predictions in a medical app (fixed).
+        if model_choice.startswith("Exp 1"):
+            cls_rgb = raw_rgb
+        elif model_choice.startswith("Exp 3"):
+            # Seg-guided: same soft context-preserving guidance as training
+            # (see classification/masking_utils.apply_soft_context_mask).
+            w = 0.40 + 0.60 * mask_prob  # (H, W)
+            cls_rgb = np.clip(
+                enh_rgb.astype(np.float32) * w[..., None], 0, 255
+            ).astype(np.uint8)
+        else:
+            cls_rgb = enh_rgb
+        cls_inp = (cls_rgb / 255.0 - mean) / std
+        cls_tensor = torch.from_numpy(
+            cls_inp.transpose(2, 0, 1)
+        ).float().unsqueeze(0).to(device)
         with torch.no_grad(), torch.amp.autocast('cuda', enabled=device.type == 'cuda'):
-            probs = torch.softmax(classifier(tensor), dim=1).squeeze().cpu().numpy()
+            probs = torch.softmax(classifier(cls_tensor), dim=1).squeeze().cpu().numpy()
             
         pred_idx   = int(np.argmax(probs))
         pred_class = CLASSES[pred_idx]
@@ -1054,8 +1054,8 @@ if upload is not None:
             
         pred_conf  = probs[pred_idx] * 100
 
-        # 6. Grad-CAM
-        heatmap = gradcam.generate_heatmap(tensor, target_category=pred_idx)
+        # 6. Grad-CAM — attribute on the SAME input the classifier saw
+        heatmap = gradcam.generate_heatmap(cls_tensor, target_category=pred_idx)
         heatmap = cv2.resize(heatmap, (256, 256))
         heatmap_c = cv2.applyColorMap((heatmap * 255).astype(np.uint8), cv2.COLORMAP_JET)
         heatmap_c = cv2.cvtColor(heatmap_c, cv2.COLOR_BGR2RGB)
