@@ -432,24 +432,40 @@ def _run_pipeline(pil_img: Image.Image, pipeline: str) -> dict:
     }
 
 
-# ── Clinical guidance (simplified, native components) ─────────────────────────
-def render_guidance(pred_class: str) -> None:
+# ── Clinical guidance: 6.1 = this scan's findings, 6.2 = general info ──────────
+# The split never changes, so the reader can tell at a glance what came from
+# their image vs what is generic category information.
+def render_guidance(pred_class: str, r: dict) -> None:
     info = COUNSELING_DB.get(pred_class, COUNSELING_DB["No Tumor"])
     plain_name, _ = PLAIN_INFO[pred_class]
     is_tumor = pred_class != "No Tumor"
+    pred_conf = float(r["probs"][r["pred_idx"]] * 100)
+    area, centroid, bbox, perim = r["area"], r["centroid"], r["bbox"], r["perim"]
     with st.expander(f"📋 Clinical guidance — {plain_name}", expanded=is_tumor):
+        st.caption("6.1 is always this scan's own findings; 6.2 is always general information.")
+        st.markdown("**6.1 · About this scan**")
+        st.caption("Findings measured from this scan only.")
+        st.markdown(f"- **AI finding:** {plain_name} ({pred_conf:.1f}% confidence)")
+        if area > 0:
+            st.markdown(f"- **Tumor area:** {area:,} px²")
+            st.markdown(f"- **Tumor perimeter:** {perim:.1f} px")
+            st.markdown(f"- **Location (centroid):** {centroid}")
+            st.markdown(f"- **Bounding box:** {bbox}")
+        else:
+            st.markdown("- **Tumor area:** No focal lesion segmented")
+        st.markdown("**6.2 · General information**")
         st.caption(
             "General information for this finding category — not personalised medical advice."
         )
-        st.markdown("**1 · About this finding**")
+        st.markdown("**About this finding**")
         st.write(info["pathological_nature"])
-        st.markdown("**2 · Precautions & red-flag symptoms**")
+        st.markdown("**Precautions & red-flag symptoms**")
         for p in info["precautions"]:
             st.markdown(f"- {p}")
-        st.markdown("**3 · Recommended workup**")
+        st.markdown("**Recommended workup**")
         for s in info["next_steps"]:
             st.markdown(f"- {s}")
-        st.markdown("**4 · Questions for your doctor**")
+        st.markdown("**Questions for your doctor**")
         for i, item in enumerate(info["checklist"]):
             st.checkbox(item, key=f"guidance_{pred_class}_{i}")
 
@@ -575,7 +591,7 @@ else:
 
     # ── Clinical guidance ──
     st.markdown('<div class="sec-t">Guidance</div>', unsafe_allow_html=True)
-    render_guidance(pred_class)
+    render_guidance(pred_class, r)
 
     # ── Report export ──
     st.markdown("---")

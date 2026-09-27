@@ -63,3 +63,24 @@ def test_pdf_report_direct_call():
     data = generate_pdf_report(**_kwargs())
     assert data[:4] == b"%PDF"
     assert len(data) > 10_000  # images + multi-page content embedded
+
+
+def test_guidance_split_61_scan_vs_62_general():
+    """Section 6 must always split: 6.1 = this scan's findings, 6.2 = general info.
+
+    The ordering and the split are a UX contract — the reader must be able to
+    tell at a glance what came from their image vs what is generic.
+    """
+    from reports.pdf_report_generator import generate_html_clinical_report
+
+    html = generate_html_clinical_report(**_kwargs())
+    i61 = html.find("6.1 About This Scan")
+    i62 = html.find("6.2 General Information")
+    assert i61 != -1 and i62 != -1, "6.1/6.2 guidance sections missing"
+    assert i61 < i62, "6.1 (this scan) must come before 6.2 (general)"
+    # 6.1 carries measured values from this inference run ...
+    assert "1,234 px2" not in html  # area here is 500
+    assert "500 px2" in html
+    assert "(32, 30)" in html
+    # ... and 6.2 carries the generic category template with its disclaimer.
+    assert "not personalised medical advice" in html[i62:]
