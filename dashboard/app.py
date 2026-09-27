@@ -23,6 +23,7 @@ from utils.device_config import get_system_execution_profile
 from enhancement.pipeline import EnhancementAblationManager, to_display_rgb
 from segmentation.unet_model import UNet
 from classification.classifier_model import BrainTumorClassifier
+from classification.masking_utils import apply_exp3_guidance_numpy
 from explainability.gradcam_generator import BrainTumorGradCAM
 from reports.pdf_report_generator import COUNSELING_DB, generate_clinical_report_bytes
 from dashboard.mri_reader import load_medical_image, volume_slice_to_pil
@@ -342,13 +343,20 @@ def _run_pipeline(pil_img: Image.Image, pipeline: str) -> dict:
         # selected experiment (Exp1: raw, Exp3: soft seg-guided, else enhanced).
         if pipeline.startswith("Exp 1"):
             cls_rgb = raw_rgb
+            cls_inp = (cls_rgb / 255.0 - mean) / std
+            cls_tensor = torch.from_numpy(cls_inp.transpose(2, 0, 1)).float().unsqueeze(0).to(device)
         elif pipeline.startswith("Exp 3"):
-            w = 0.40 + 0.60 * mask_prob
-            cls_rgb = np.clip(enh_rgb.astype(np.float32) * w[..., None], 0, 255).astype(np.uint8)
+            # PARITY WITH TRAINING (classification/run_experiments.py ::
+            # apply_exp3_guidance, via masking_utils.apply_exp3_guidance_numpy):
+            # guidance in NORMALIZED space — not uint8 space — with the same
+            # 50px empty-mask guard, so a healthy scan is never darkened.
+            cls_tensor = torch.from_numpy(
+                apply_exp3_guidance_numpy(enh_rgb, mask_prob, mean, std)
+            ).to(device)
         else:
             cls_rgb = enh_rgb
-        cls_inp = (cls_rgb / 255.0 - mean) / std
-        cls_tensor = torch.from_numpy(cls_inp.transpose(2, 0, 1)).float().unsqueeze(0).to(device)
+            cls_inp = (cls_rgb / 255.0 - mean) / std
+            cls_tensor = torch.from_numpy(cls_inp.transpose(2, 0, 1)).float().unsqueeze(0).to(device)
         with torch.no_grad(), torch.amp.autocast('cuda', enabled=device.type == 'cuda'):
             probs = torch.softmax(classifier(cls_tensor), dim=1).squeeze().cpu().numpy()
 
