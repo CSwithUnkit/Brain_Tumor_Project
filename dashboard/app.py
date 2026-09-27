@@ -331,6 +331,14 @@ st.markdown(
 # ── Inference (staged, cached in session so UI interactions don't recompute) ───
 def _run_pipeline(pil_img: Image.Image, pipeline: str) -> dict:
     """Full validated pipeline. Returns plain arrays/scalars for the UI."""
+    # Train/serve parity (FR-007): training loads every image as 3-channel
+    # (cv2.IMREAD_COLOR), so replicate grayscale uploads/slices to RGB *before*
+    # enhancement. Enhancing a native 2D array takes a different code path
+    # (direct) than 3-channel input (luminance-only LAB) -- silently skewing
+    # the classifier input distribution for grayscale MRIs.
+    if pil_img.mode != "RGB":
+        pil_img = pil_img.convert("RGB")
+
     unet, classifier, device = load_models(pipeline)
     enhancer = EnhancementAblationManager()
     gradcam = BrainTumorGradCAM(classifier, use_cuda=(device.type == "cuda"))
