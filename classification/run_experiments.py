@@ -111,7 +111,9 @@ def main():
     num_workers = args.num_workers if args.num_workers is not None else profile["num_workers"]
     use_amp     = profile["use_amp"]
     pin_memory  = profile["pin_memory"]
-    persistent_workers = profile["persistent_workers"]
+    # persistent_workers requires num_workers > 0 — guard the case where the
+    # user explicitly passes --num_workers 0 (e.g. tiny CPU smoke runs).
+    persistent_workers = profile["persistent_workers"] and num_workers > 0
 
     logger.info(
         f"ℹ️ [INFO] Hardware Profile → Device: {device} ({profile['gpu_name']}) | "
