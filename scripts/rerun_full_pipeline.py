@@ -8,8 +8,9 @@ Reproduces every number the paper/docs claim, in dependency order:
     3. exp1     EfficientNetB2 baseline (raw images)
     4. exp2     EfficientNetB2 enhanced (cached)
     5. exp3     seg-guided + soft-masked (needs the U-Net checkpoint)
-    6. pmram    external PMRAM validation with checkpoint provenance
-    7. reports  regenerate consolidated evidence-honest reports
+    6. xai      Grad-CAM localization vs GT masks (needs trained classifiers)
+    7. pmram    external PMRAM validation with checkpoint provenance
+    8. reports  regenerate consolidated evidence-honest reports
 
 Full mode (needs a GPU + the real datasets under data/):
 
@@ -47,7 +48,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-STAGES = ["cache", "unet", "exp1", "exp2", "exp3", "pmram", "reports"]
+STAGES = ["cache", "unet", "exp1", "exp2", "exp3", "xai", "pmram", "reports"]
 
 # --------------------------------------------------------------------------- #
 # helpers
@@ -84,7 +85,24 @@ def preflight(full_mode):
             )
         if not torch.cuda.is_available():
             logger.warning("⚠ No CUDA GPU detected — full training on CPU will be extremely slow.")
+        pmram_root = PROJECT_ROOT / "data" / "pmram"
+        if not pmram_root.exists() or not any(pmram_root.rglob("*.jpg")):
+            logger.warning(
+                "⚠ No PMRAM images under data/pmram — the 'pmram' stage will fail. "
+                "Download it or pass --skip-pmram."
+            )
     logger.info("✓ Preflight OK")
+
+
+def require_unet_checkpoint():
+    """C2: exp3 must never train on unmasked images while labeled 'seg-guided'."""
+    ckpt = PROJECT_ROOT / "checkpoints" / "unet" / "best_unet_enhanced.pth"
+    if not ckpt.exists():
+        raise FileNotFoundError(
+            f"Exp3 stage needs the trained U-Net at {ckpt}, which is missing. "
+            "Run the 'unet' stage first (or --from-stage unet). Refusing to "
+            "produce a mislabeled 'seg-guided' experiment."
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -252,12 +270,20 @@ def main():
 
         # 5. exp3 (both variants, needs the trained U-Net)
         if stage_enabled("exp3"):
+            require_unet_checkpoint()
             for exp in ["exp3_seg_guided", "exp3_soft_masked"]:
                 run([py, "-m", "classification.run_experiments", "--experiment", exp,
                      "--epochs", str(epochs_cls), "--unet_checkpoint", unet_ckpt] + extra,
                     workdir, env, exp)
 
-        # 6. pmram
+        # 6. xai — quantitative Grad-CAM localization on the held-out
+        #    segmentation test split (fail-hard on missing checkpoints)
+        if stage_enabled("xai"):
+            run([py, "-m", "explainability.run_localization_eval",
+                 "--max_samples", "200" if not args.smoke else "8"],
+                workdir, env, "xai")
+
+        # 7. pmram
         if stage_enabled("pmram") and do_pmram:
             run([py, "-m", "validation.external_pmram",
                  "--model_path", "checkpoints/classification/best_efficientnet_exp2_enhanced.pth",
@@ -266,7 +292,7 @@ def main():
         elif stage_enabled("pmram"):
             logger.info("⊘ Stage 'pmram' skipped (--skip-pmram / smoke mode)")
 
-        # 7. reports — ReportConsolidator defaults to the *source file's*
+        # 8. reports — ReportConsolidator defaults to the *source file's*
         # location, so in smoke mode we must inject the isolated workdir
         # explicitly, otherwise it overwrites the real repo's reports/.
         if stage_enabled("reports"):
@@ -289,6 +315,9 @@ def main():
         expected += [
             "results/metrics_exp3_seg_guided_test.json",
             "results/metrics_exp3_soft_masked_test.json",
+            "results/gradcam_localization_summary.json",
+            "results/pmram_external_validation.json",
+            "reports/PHASE_II_FINAL_PROJECT_REPORT.md",
         ]
     missing = [f for f in expected if not (workdir / f).exists()]
     dt = time.time() - t_all

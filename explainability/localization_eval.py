@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import numpy as np
-from typing import Dict, List, Any
+from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,8 @@ class LocalizationEvaluator:
                     'mean_iou': float(np.mean(metrics['iou'])),
                     'std_iou': float(np.std(metrics['iou'])),
                     'mean_dice': float(np.mean(metrics['dice'])),
-                    'std_dice': float(np.std(metrics['dice']))
+                    'std_dice': float(np.std(metrics['dice'])),
+                    'n_samples': int(len(metrics['iou'])),
                 }
                 
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
