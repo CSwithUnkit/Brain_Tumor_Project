@@ -54,17 +54,17 @@ def get_system_execution_profile() -> dict:
 
     # ── System RAM ────────────────────────────────────────────────────────────
     vm = psutil.virtual_memory()
-    total_ram_gb     = vm.total    / (1024 ** 3)
-    available_ram_gb = vm.available / (1024 ** 3)
-    cpu_count        = os.cpu_count() or 4
+    total_ram_gb = vm.total / (1024**3)
+    available_ram_gb = vm.available / (1024**3)
+    cpu_count = os.cpu_count() or 4
 
     # ── GPU VRAM inspection ───────────────────────────────────────────────────
-    vram_gb  = 0.0
+    vram_gb = 0.0
     gpu_name = "CPU"
     if has_cuda:
         gpu_props = torch.cuda.get_device_properties(0)
-        gpu_name  = gpu_props.name
-        vram_gb   = gpu_props.total_memory / (1024 ** 3)
+        gpu_name = gpu_props.name
+        vram_gb = gpu_props.total_memory / (1024**3)
 
     # ── Dynamic Safe Batch Size ───────────────────────────────────────────────
     # Respects VRAM tiers on GPU; falls back to RAM-aware sizes on CPU.
@@ -77,7 +77,7 @@ def get_system_execution_profile() -> dict:
         else:
             batch_size = 8
     else:
-        use_amp    = False
+        use_amp = False
         batch_size = 4 if total_ram_gb <= 8.0 else 8
 
     # ── Safe DataLoader Worker Allocation ─────────────────────────────────────
@@ -93,21 +93,21 @@ def get_system_execution_profile() -> dict:
         # Linux / macOS / Google Colab
         num_workers = 2 if total_ram_gb <= 8.5 else min(4, cpu_count)
 
-    pin_memory         = has_cuda          # Pinned memory only helps CUDA DMA
-    persistent_workers = num_workers > 0   # Keep workers alive between epochs
+    pin_memory = has_cuda  # Pinned memory only helps CUDA DMA
+    persistent_workers = num_workers > 0  # Keep workers alive between epochs
 
     return {
-        "device"             : device,
-        "gpu_name"           : gpu_name,
-        "has_cuda"           : has_cuda,
-        "vram_gb"            : round(vram_gb, 2),
-        "total_ram_gb"       : round(total_ram_gb, 2),
-        "available_ram_gb"   : round(available_ram_gb, 2),
-        "batch_size"         : batch_size,
-        "num_workers"        : num_workers,
-        "use_amp"            : use_amp,
-        "pin_memory"         : pin_memory,
-        "persistent_workers" : persistent_workers,
+        "device": device,
+        "gpu_name": gpu_name,
+        "has_cuda": has_cuda,
+        "vram_gb": round(vram_gb, 2),
+        "total_ram_gb": round(total_ram_gb, 2),
+        "available_ram_gb": round(available_ram_gb, 2),
+        "batch_size": batch_size,
+        "num_workers": num_workers,
+        "use_amp": use_amp,
+        "pin_memory": pin_memory,
+        "persistent_workers": persistent_workers,
     }
 
 
@@ -120,8 +120,10 @@ def print_profile(profile: dict) -> None:
     print(f"  Device          : {profile['device']} ({profile['gpu_name']})")
     if profile["has_cuda"]:
         print(f"  VRAM            : {profile['vram_gb']:.2f} GB")
-    print(f"  Total RAM       : {profile['total_ram_gb']:.2f} GB  "
-          f"(available: {profile['available_ram_gb']:.2f} GB)")
+    print(
+        f"  Total RAM       : {profile['total_ram_gb']:.2f} GB  "
+        f"(available: {profile['available_ram_gb']:.2f} GB)"
+    )
     print(f"  Batch Size      : {profile['batch_size']}")
     print(f"  DataLoader Workers: {profile['num_workers']}")
     print(f"  AMP (fp16)      : {profile['use_amp']}")
@@ -131,6 +133,7 @@ def print_profile(profile: dict) -> None:
 
 
 # ── Atomic file save helpers ──────────────────────────────────────────────────
+
 
 def atomic_torch_save(obj, path: str) -> None:
     """
@@ -150,6 +153,7 @@ def atomic_json_save(data, path: str, indent: int = 4) -> None:
     Save a JSON-serialisable object atomically to prevent write-corruption.
     """
     import json
+
     tmp_path = path + ".tmp"
     with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=indent)

@@ -91,14 +91,13 @@ def build_experiment_input(exp: str, image_path: str, device, unet_model=None) -
                 f"guidance but no checkpoint was provided/loaded."
             )
         from classification.run_experiments import apply_exp3_guidance
+
         # U-Net is frozen here — no gradients needed through the mask.
         # (Grad-CAM, by contrast, MUST run with grad enabled: it calls
         # backward() internally. The caller's torch.no_grad() must NOT
         # cover cam.generate_heatmap.)
         with torch.no_grad():
-            tensor = apply_exp3_guidance(
-                tensor, unet_model, soft=(exp == "exp3_soft_masked")
-            )
+            tensor = apply_exp3_guidance(tensor, unet_model, soft=(exp == "exp3_soft_masked"))
     return tensor
 
 
@@ -137,12 +136,17 @@ def load_unet(device):
 def main() -> None:
     ap = argparse.ArgumentParser(description="Grad-CAM localization evaluation driver.")
     ap.add_argument("--experiments", nargs="+", default=EXPERIMENTS, choices=EXPERIMENTS)
-    ap.add_argument("--max_samples", type=int, default=200,
-                    help="Cap on test samples per experiment (deterministic first-N).")
+    ap.add_argument(
+        "--max_samples",
+        type=int,
+        default=200,
+        help="Cap on test samples per experiment (deterministic first-N).",
+    )
     ap.add_argument("--output", default="results/gradcam_localization_summary.json")
     args = ap.parse_args()
 
     from utils.device_config import get_system_execution_profile
+
     device = get_system_execution_profile()["device"]
 
     meta_path = "data/brisc/brisc_metadata.json"
@@ -155,6 +159,7 @@ def main() -> None:
 
     # Same deterministic split the U-Net itself is evaluated on.
     from data.dataset_preprocessor import split_dataset
+
     _, _, test_pairs = split_dataset(seg_pairs, random_state=42)
     test_pairs = test_pairs[: args.max_samples]
     logger.info(f"Held-out segmentation test samples: {len(test_pairs)}")

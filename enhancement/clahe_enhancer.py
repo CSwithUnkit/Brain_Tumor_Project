@@ -1,15 +1,18 @@
 import cv2
 import numpy as np
 
-def apply_clahe(image: np.ndarray, clip_limit: float = 2.0, tile_grid_size: tuple = (8, 8)) -> np.ndarray:
+
+def apply_clahe(
+    image: np.ndarray, clip_limit: float = 2.0, tile_grid_size: tuple = (8, 8)
+) -> np.ndarray:
     """
     FR-014: Contrast Limited Adaptive Histogram Equalization using OpenCV.
-    
+
     Args:
         image: 2D numpy array (grayscale image, can be float or uint8)
         clip_limit: Threshold for contrast limiting (default: 2.0)
         tile_grid_size: Size of grid for histogram equalization (default: (8, 8))
-        
+
     Returns:
         Enhanced image with the same dtype and dynamic range as the input
         (previous versions silently remapped float [0, 255] inputs to [0, 1]).

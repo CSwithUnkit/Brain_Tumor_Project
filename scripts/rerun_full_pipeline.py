@@ -54,6 +54,7 @@ STAGES = ["cache", "unet", "exp1", "exp2", "exp3", "xai", "pmram", "reports"]
 # helpers
 # --------------------------------------------------------------------------- #
 
+
 def run(cmd, cwd, env, stage_name):
     """Run a stage subprocess; raise on failure."""
     logger.info(f"\n{'=' * 70}\n▶ STAGE: {stage_name}\n  $ {' '.join(cmd)}\n{'=' * 70}")
@@ -74,6 +75,7 @@ def base_env():
 
 def preflight(full_mode):
     import torch  # noqa: F401  (validates the dep is installed)
+
     if full_mode:
         meta = PROJECT_ROOT / "data" / "brisc" / "brisc_metadata.json"
         if not meta.exists():
@@ -109,13 +111,16 @@ def require_unet_checkpoint():
 # stage 1: enhancement cache rebuild (ported from notebook 01, cell 6)
 # --------------------------------------------------------------------------- #
 
+
 def build_cache(cache_dir="data/cached_enhanced", limit=None):
-    import cv2
     import glob
+
+    import cv2
     import numpy as np
     from tqdm.auto import tqdm
-    from enhancement.pipeline import EnhancementAblationManager
+
     from data.dataset_preprocessor import cached_enhanced_target
+    from enhancement.pipeline import EnhancementAblationManager
 
     if os.path.exists(cache_dir):
         shutil.rmtree(cache_dir)
@@ -129,7 +134,8 @@ def build_cache(cache_dir="data/cached_enhanced", limit=None):
         + glob.glob("data/brisc/**/*.png", recursive=True)
     )
     image_paths = [
-        p for p in all_paths
+        p
+        for p in all_paths
         if "mask" not in os.path.basename(p).lower()
         and os.path.basename(os.path.dirname(p)).lower() != "masks"
         and cache_dir not in p.replace(os.sep, "/")
@@ -154,6 +160,7 @@ def build_cache(cache_dir="data/cached_enhanced", limit=None):
 # --------------------------------------------------------------------------- #
 # smoke mode: synthetic mini dataset
 # --------------------------------------------------------------------------- #
+
 
 def build_smoke_dataset(smoke_root: Path, per_class: int = 8):
     """Create a tiny BRISC-shaped dataset of synthetic MRI slices + masks."""
@@ -188,10 +195,12 @@ def build_smoke_dataset(smoke_root: Path, per_class: int = 8):
 
             rel_img = os.path.join("data", "brisc", cls, p.name)
             classification.append({"path": rel_img, "class": cls})
-            segmentation.append({
-                "image_path": rel_img,
-                "mask_path": os.path.join("data", "brisc", cls, mp.name),
-            })
+            segmentation.append(
+                {
+                    "image_path": rel_img,
+                    "mask_path": os.path.join("data", "brisc", cls, mp.name),
+                }
+            )
 
     meta = {
         "classification_count": len(classification),
@@ -209,14 +218,25 @@ def build_smoke_dataset(smoke_root: Path, per_class: int = 8):
 # main
 # --------------------------------------------------------------------------- #
 
+
 def main():
     ap = argparse.ArgumentParser(description="Full post-fix experiment re-run.")
-    ap.add_argument("--smoke", action="store_true",
-                    help="CPU smoke test on synthetic data; touches nothing in the repo.")
-    ap.add_argument("--from-stage", choices=STAGES, default="cache",
-                    help="Resume from this stage (default: cache).")
-    ap.add_argument("--skip-cache", action="store_true",
-                    help="Reuse existing data/cached_enhanced instead of rebuilding.")
+    ap.add_argument(
+        "--smoke",
+        action="store_true",
+        help="CPU smoke test on synthetic data; touches nothing in the repo.",
+    )
+    ap.add_argument(
+        "--from-stage",
+        choices=STAGES,
+        default="cache",
+        help="Resume from this stage (default: cache).",
+    )
+    ap.add_argument(
+        "--skip-cache",
+        action="store_true",
+        help="Reuse existing data/cached_enhanced instead of rebuilding.",
+    )
     ap.add_argument("--epochs-unet", type=int, default=25)
     ap.add_argument("--epochs-cls", type=int, default=25)
     ap.add_argument("--skip-pmram", action="store_true", help="Skip external PMRAM validation.")
@@ -257,38 +277,97 @@ def main():
 
         # 2. unet
         if stage_enabled("unet"):
-            run([py, "-m", "segmentation.train_unet", "--input_type", "enhanced",
-                 "--epochs", str(epochs_unet)] + extra, workdir, env, "unet")
+            run(
+                [
+                    py,
+                    "-m",
+                    "segmentation.train_unet",
+                    "--input_type",
+                    "enhanced",
+                    "--epochs",
+                    str(epochs_unet),
+                ]
+                + extra,
+                workdir,
+                env,
+                "unet",
+            )
 
         unet_ckpt = "checkpoints/unet/best_unet_enhanced.pth"
 
         # 3-4. exp1 / exp2
         for exp in ["exp1_baseline", "exp2_enhanced"]:
             if stage_enabled(exp[:4]):
-                run([py, "-m", "classification.run_experiments", "--experiment", exp,
-                     "--epochs", str(epochs_cls)] + extra, workdir, env, exp)
+                run(
+                    [
+                        py,
+                        "-m",
+                        "classification.run_experiments",
+                        "--experiment",
+                        exp,
+                        "--epochs",
+                        str(epochs_cls),
+                    ]
+                    + extra,
+                    workdir,
+                    env,
+                    exp,
+                )
 
         # 5. exp3 (both variants, needs the trained U-Net)
         if stage_enabled("exp3"):
             require_unet_checkpoint()
             for exp in ["exp3_seg_guided", "exp3_soft_masked"]:
-                run([py, "-m", "classification.run_experiments", "--experiment", exp,
-                     "--epochs", str(epochs_cls), "--unet_checkpoint", unet_ckpt] + extra,
-                    workdir, env, exp)
+                run(
+                    [
+                        py,
+                        "-m",
+                        "classification.run_experiments",
+                        "--experiment",
+                        exp,
+                        "--epochs",
+                        str(epochs_cls),
+                        "--unet_checkpoint",
+                        unet_ckpt,
+                    ]
+                    + extra,
+                    workdir,
+                    env,
+                    exp,
+                )
 
         # 6. xai — quantitative Grad-CAM localization on the held-out
         #    segmentation test split (fail-hard on missing checkpoints)
         if stage_enabled("xai"):
-            run([py, "-m", "explainability.run_localization_eval",
-                 "--max_samples", "200" if not args.smoke else "8"],
-                workdir, env, "xai")
+            run(
+                [
+                    py,
+                    "-m",
+                    "explainability.run_localization_eval",
+                    "--max_samples",
+                    "200" if not args.smoke else "8",
+                ],
+                workdir,
+                env,
+                "xai",
+            )
 
         # 7. pmram
         if stage_enabled("pmram") and do_pmram:
-            run([py, "-m", "validation.external_pmram",
-                 "--model_path", "checkpoints/classification/best_efficientnet_exp2_enhanced.pth",
-                 "--brisc_metrics", "results/metrics_exp2_enhanced_test.json"],
-                workdir, env, "pmram")
+            run(
+                [
+                    py,
+                    "-m",
+                    "validation.external_pmram",
+                    "--model_path",
+                    "checkpoints/classification/best_efficientnet_exp2_enhanced.pth",
+                    "--brisc_metrics",
+                    "results/metrics_exp2_enhanced_test.json",
+                ],
+                workdir,
+                env,
+                "pmram",
+            )
         elif stage_enabled("pmram"):
             logger.info("⊘ Stage 'pmram' skipped (--skip-pmram / smoke mode)")
 
@@ -296,10 +375,17 @@ def main():
         # location, so in smoke mode we must inject the isolated workdir
         # explicitly, otherwise it overwrites the real repo's reports/.
         if stage_enabled("reports"):
-            run([py, "-c",
-                 "from evaluation.consolidate_reports import ReportConsolidator; "
-                 "ReportConsolidator(project_root='.').run()"],
-                workdir, env, "reports")
+            run(
+                [
+                    py,
+                    "-c",
+                    "from evaluation.consolidate_reports import ReportConsolidator; "
+                    "ReportConsolidator(project_root='.').run()",
+                ],
+                workdir,
+                env,
+                "reports",
+            )
 
     except Exception as e:
         logger.error(f"\n✗ PIPELINE STOPPED: {e}")
@@ -324,7 +410,9 @@ def main():
     if missing:
         logger.warning(f"⚠ Finished in {dt:.0f}s but missing outputs: {missing}")
     else:
-        logger.info(f"\n✅ FULL RE-RUN COMPLETE in {dt / 3600:.1f}h — all expected outputs present.")
+        logger.info(
+            f"\n✅ FULL RE-RUN COMPLETE in {dt / 3600:.1f}h — all expected outputs present."
+        )
         for f in expected:
             logger.info(f"   • {f}")
 

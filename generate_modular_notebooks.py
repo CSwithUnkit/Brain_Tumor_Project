@@ -1,16 +1,25 @@
-import os
 import json
+import os
+
 
 def create_notebook(filename, cells_data):
     cells = []
     for cell_type, content in cells_data:
-        source = [line + '\n' for line in content.split('\n')]
+        source = [line + "\n" for line in content.split("\n")]
         if source:
-            source[-1] = source[-1].rstrip('\n')
-        if cell_type == 'markdown':
+            source[-1] = source[-1].rstrip("\n")
+        if cell_type == "markdown":
             cells.append({"cell_type": "markdown", "metadata": {}, "source": source})
-        elif cell_type == 'code':
-            cells.append({"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": source})
+        elif cell_type == "code":
+            cells.append(
+                {
+                    "cell_type": "code",
+                    "execution_count": None,
+                    "metadata": {},
+                    "outputs": [],
+                    "source": source,
+                }
+            )
 
     nb = {
         "cells": cells,
@@ -20,27 +29,32 @@ def create_notebook(filename, cells_data):
             "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
             "language_info": {
                 "codemirror_mode": {"name": "ipython", "version": 3},
-                "file_extension": ".py", "mimetype": "text/x-python",
-                "name": "python", "nbconvert_exporter": "python",
-                "pygments_lexer": "ipython3", "version": "3.11.0"
-            }
+                "file_extension": ".py",
+                "mimetype": "text/x-python",
+                "name": "python",
+                "nbconvert_exporter": "python",
+                "pygments_lexer": "ipython3",
+                "version": "3.11.0",
+            },
         },
         "nbformat": 4,
-        "nbformat_minor": 4
+        "nbformat_minor": 4,
     }
-    with open(filename, 'w', encoding='utf-8') as f:
+    with open(filename, "w", encoding="utf-8") as f:
         json.dump(nb, f, indent=1)
     print(f"Created {filename}")
 
 
 def main():
-    os.makedirs('notebooks', exist_ok=True)
+    os.makedirs("notebooks", exist_ok=True)
 
     # =========================================================================
     # NOTEBOOK 1: Data Preparation and Offline Enhancement Caching
     # =========================================================================
     nb1_cells = [
-        ('markdown', '''# 🧠 MRI Image Enhancement and Tumor Detection
+        (
+            "markdown",
+            """# 🧠 MRI Image Enhancement and Tumor Detection
 ## Notebook 1: Data Ingestion, Verification & Offline Enhancement Caching
 **Authors:** Ankit Yadav, Bhaskar Rawat, Harsh Singh, Mayank Chandra Das  
 **Supervisor:** Mr. Manish Kumar Sharma | ITS Engineering College, AKTU
@@ -54,9 +68,11 @@ def main():
 5. Execute **Offline WPT→LMMSE→CLAHE enhancement caching** (15x training speedup)
 6. Visualize raw vs enhanced image quality
 
-> ⚠️ **Run all cells top-to-bottom. Do NOT skip cells.**'''),
-
-        ('code', '''# ── Cell 1: Environment Setup & Hardware Profile ───────────────────────────
+> ⚠️ **Run all cells top-to-bottom. Do NOT skip cells.**""",
+        ),
+        (
+            "code",
+            """# ── Cell 1: Environment Setup & Hardware Profile ───────────────────────────
 from __future__ import annotations
 import os, sys
 
@@ -93,9 +109,11 @@ print(f"✅ Python Path configured")
 from utils.device_config import get_system_execution_profile
 profile = get_system_execution_profile()
 print(f"🖥️ System Profile: {profile['gpu_name']} ({profile['vram_gb']} GB VRAM) | RAM: {profile['total_ram_gb']} GB | Workers: {profile['num_workers']}")
-print(f"   Device: {profile['device']} | AMP: {profile['use_amp']} | Batch size: {profile['batch_size']}")'''),
-
-        ('code', '''# ── Cell 2: Install Dependencies ────────────────────────────────────────────
+print(f"   Device: {profile['device']} | AMP: {profile['use_amp']} | Batch size: {profile['batch_size']}")""",
+        ),
+        (
+            "code",
+            """# ── Cell 2: Install Dependencies ────────────────────────────────────────────
 import subprocess, sys
 
 print("Installing dependencies...")
@@ -115,9 +133,11 @@ if result.returncode != 0:
 import torch, cv2, pywt, albumentations
 print(f"✅ PyTorch {torch.__version__} | CUDA available: {torch.cuda.is_available()}")
 print(f"✅ OpenCV {cv2.__version__} | PyWavelets {pywt.__version__}")
-print(f"✅ All dependencies installed successfully")'''),
-
-        ('code', '''# ── Cell 3: Kaggle API Configuration ────────────────────────────────────────
+print(f"✅ All dependencies installed successfully")""",
+        ),
+        (
+            "code",
+            """# ── Cell 3: Kaggle API Configuration ────────────────────────────────────────
 import os, shutil, json
 
 KAGGLE_DIR = os.path.expanduser("~/.kaggle")
@@ -134,9 +154,11 @@ if os.path.exists(local_kaggle):
 else:
     print("⚠️  kaggle.json not found in project root.")
     print("   Upload it manually or place it at: kaggle.json")
-    print("   Get yours from: https://www.kaggle.com/settings → API → Create New Token")'''),
-
-        ('code', '''# ── Cell 4: Dataset Download & Extraction ───────────────────────────────────
+    print("   Get yours from: https://www.kaggle.com/settings → API → Create New Token")""",
+        ),
+        (
+            "code",
+            """# ── Cell 4: Dataset Download & Extraction ───────────────────────────────────
 import os
 
 # ─── BRISC Dataset ───
@@ -170,9 +192,11 @@ if dirs:
     if len(dirs) > 15:
         print(f"... and {len(dirs) - 15} more directories.")
 else:
-    print("  (empty — check dataset ID above)")'''),
-
-        ('code', '''# ── Cell 5: High-Speed Structural Dataset Ingestion (<5 seconds) ────────────
+    print("  (empty — check dataset ID above)")""",
+        ),
+        (
+            "code",
+            """# ── Cell 5: High-Speed Structural Dataset Ingestion (<5 seconds) ────────────
 import time
 
 print("Running structural ingestion (no MD5 hashing — ultra-fast)...")
@@ -204,9 +228,11 @@ print(f"  Segmentation pairs    : {meta['segmentation_count']:,}")
 print(f"{'='*50}")
 assert meta["classification_count"] >= 6000, "Too few classification images!"
 assert meta["segmentation_count"] >= 4700,   "Too few segmentation pairs!"
-print("✅ Dataset integrity verified")'''),
-
-        ('code', '''# ── Cell 6: Offline WPT→LMMSE→CLAHE Enhancement Caching ──────────────────
+print("✅ Dataset integrity verified")""",
+        ),
+        (
+            "code",
+            """# ── Cell 6: Offline WPT→LMMSE→CLAHE Enhancement Caching ──────────────────
 # Eliminates all on-the-fly CPU enhancement overhead during GPU training
 # Expected: ~4,793 segmentation images + 6,000 classification images
 import os, cv2, glob, numpy as np, shutil
@@ -256,9 +282,11 @@ for path in tqdm(image_paths, desc="WPT\\u2192LMMSE\\u2192CLAHE", unit="img", dy
 total_cached = sum(1 for _ in glob.glob(f"{CACHE_DIR}/**/*.*", recursive=True))
 print(f"\\n\\u2705 Enhancement caching complete!")
 print(f"   Total cached images : {total_cached:,}")
-print(f"   Errors (unreadable) : {errors}")'''),
-
-        ('code', '''# ── Cell 7: Enhancement Ablation Quality Metrics Table ──────────────────────
+print(f"   Errors (unreadable) : {errors}")""",
+        ),
+        (
+            "code",
+            """# ── Cell 7: Enhancement Ablation Quality Metrics Table ──────────────────────
 import subprocess, sys
 result = subprocess.run(
     [sys.executable, "-m", "enhancement.pipeline"],
@@ -266,9 +294,11 @@ result = subprocess.run(
 )
 print(result.stdout)
 if result.returncode != 0:
-    print("STDERR:", result.stderr[-500:])'''),
-
-        ('code', '''# ── Cell 8: Visual QC — Raw vs Enhanced Side-by-Side (Diverse Percentile Sampling) ──
+    print("STDERR:", result.stderr[-500:])""",
+        ),
+        (
+            "code",
+            """# ── Cell 8: Visual QC — Raw vs Enhanced Side-by-Side (Diverse Percentile Sampling) ──
 import cv2, numpy as np, matplotlib.pyplot as plt, glob, os
 
 CACHE_DIR = "data/cached_enhanced"
@@ -339,16 +369,19 @@ else:
     plt.tight_layout()
     plt.show()
     print(f"\\u2705 Visualized {len(samples)} diverse brain slices")
-    print("   Expected: Enhanced pixel range should be [~0, ~200\\u2013255] for valid MRI scans.")'''),
+    print("   Expected: Enhanced pixel range should be [~0, ~200\\u2013255] for valid MRI scans.")""",
+        ),
     ]
 
-    create_notebook('notebooks/01_data_prep_and_enhancement.ipynb', nb1_cells)
+    create_notebook("notebooks/01_data_prep_and_enhancement.ipynb", nb1_cells)
 
     # =========================================================================
     # NOTEBOOK 2: U-Net Segmentation Training
     # =========================================================================
     nb2_cells = [
-        ('markdown', '''# 🧠 MRI Image Enhancement and Tumor Detection
+        (
+            "markdown",
+            """# 🧠 MRI Image Enhancement and Tumor Detection
 ## Notebook 2: High-Precision U-Net Tumor Segmentation Training
 **Prerequisite:** Run Notebook 1 first to cache enhanced images.
 
@@ -360,9 +393,11 @@ else:
 4. Plot convergence curves and visualize segmentation overlays
 5. Save best checkpoint to `checkpoints/unet/best_unet_enhanced.pth`
 
-> 💡 **Expected training time:** ~35–50 minutes on Colab T4 GPU (25 epochs × ~210 batches)'''),
-
-        ('code', '''# ── Cell 1: Environment Setup & Hardware Profile ───────────────────────────
+> 💡 **Expected training time:** ~35–50 minutes on Colab T4 GPU (25 epochs × ~210 batches)""",
+        ),
+        (
+            "code",
+            """# ── Cell 1: Environment Setup & Hardware Profile ───────────────────────────
 from __future__ import annotations
 import os, sys
 
@@ -396,9 +431,11 @@ import torch
 device = profile["device"]
 if profile["has_cuda"]:
     torch.cuda.empty_cache()
-print(f"✅ PyTorch {torch.__version__} | Device: {device} | AMP: {profile[\'use_amp\']}")'''),
-
-        ('code', '''# ── Cell 2: Verify Prerequisites ─────────────────────────────────────────────
+print(f"✅ PyTorch {torch.__version__} | Device: {device} | AMP: {profile[\'use_amp\']}")""",
+        ),
+        (
+            "code",
+            """# ── Cell 2: Verify Prerequisites ─────────────────────────────────────────────
 import os, json
 
 META_PATH = "data/brisc/brisc_metadata.json"
@@ -416,9 +453,11 @@ cached    = len([f for f in os.listdir(CACHE_DIR) if not f.startswith(".")])
 print(f"✅ Segmentation pairs available : {seg_count:,}")
 print(f"✅ Cached enhanced images       : {cached:,}")
 assert seg_count >= 4700, "Too few segmentation pairs — re-run Notebook 1"
-print("\\n✅ All prerequisites satisfied. Ready to train.")'''),
-
-        ('code', '''# ── Cell 3: DataLoader Setup (profile-driven batch size & workers) ───────────
+print("\\n✅ All prerequisites satisfied. Ready to train.")""",
+        ),
+        (
+            "code",
+            """# ── Cell 3: DataLoader Setup (profile-driven batch size & workers) ───────────
 import json, random
 import torch
 from torch.utils.data import DataLoader
@@ -463,9 +502,11 @@ val_loader   = DataLoader(val_ds,   batch_size=BATCH_SIZE, shuffle=False,
 
 print(f"✅ Train: {len(train_ds):,} images → {len(train_loader)} batches/epoch")
 print(f"✅ Val  : {len(val_ds):,} images → {len(val_loader)} batches/epoch")
-print(f"\u2705 Batch size: {BATCH_SIZE} | Workers: {NUM_WORKERS} | Pin memory: {PIN_MEMORY}")'''),
-
-        ('code', '''# ── Cell 4: Model, Loss, Optimizer Configuration ─────────────────────────────
+print(f"\u2705 Batch size: {BATCH_SIZE} | Workers: {NUM_WORKERS} | Pin memory: {PIN_MEMORY}")""",
+        ),
+        (
+            "code",
+            """# ── Cell 4: Model, Loss, Optimizer Configuration ─────────────────────────────
 import torch, torch.nn as nn, torch.optim as optim
 
 from segmentation.unet_model import UNet
@@ -493,9 +534,11 @@ scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda")
 
 print(f"✅ Loss: 0.4×BCE(pos_weight=10) + 0.6×TverskyFocal(α=0.7, β=0.3, γ=0.75)")
 print(f"✅ Optimizer: AdamW lr=1e-4 | Scheduler: ReduceLROnPlateau(patience=5)")
-print(f"✅ Mixed Precision: {device.type == 'cuda'}")'''),
-
-        ('code', '''# ── Cell 5: Training Loop (execute from CLI for cleaner output) ─────────────
+print(f"✅ Mixed Precision: {device.type == 'cuda'}")""",
+        ),
+        (
+            "code",
+            """# ── Cell 5: Training Loop (execute from CLI for cleaner output) ─────────────
 # This launches train_unet.py as a subprocess so TQDM progress bars render correctly
 import subprocess, sys
 
@@ -518,9 +561,11 @@ proc.wait()
 if proc.returncode == 0:
     print("\\n✅ Training complete!")
 else:
-    raise RuntimeError(f"Training failed with exit code {proc.returncode}")'''),
-
-        ('code', '''# ── Cell 6: Training Curves ──────────────────────────────────────────────────
+    raise RuntimeError(f"Training failed with exit code {proc.returncode}")""",
+        ),
+        (
+            "code",
+            """# ── Cell 6: Training Curves ──────────────────────────────────────────────────
 import json, os, matplotlib.pyplot as plt
 
 HISTORY_FILE = "checkpoints/unet/unet_training_history_enhanced.json"
@@ -546,9 +591,11 @@ else:
     plt.tight_layout()
     plt.savefig("reports/figures/unet_dice_curve.png", dpi=150)
     plt.show()
-    print(f"✅ Best Val Dice: {max(val_dice):.4f} at Epoch {val_dice.index(max(val_dice)) + 1}")'''),
-
-        ('code', '''# ── Cell 7: Qualitative Segmentation Visualization ───────────────────────────
+    print(f"✅ Best Val Dice: {max(val_dice):.4f} at Epoch {val_dice.index(max(val_dice)) + 1}")""",
+        ),
+        (
+            "code",
+            """# ── Cell 7: Qualitative Segmentation Visualization ───────────────────────────
 import torch, cv2, numpy as np, matplotlib.pyplot as plt, glob, os, random
 
 from segmentation.unet_model import UNet
@@ -608,16 +655,19 @@ else:
     plt.suptitle("U-Net Tumor Segmentation — Qualitative QC", fontsize=14, fontweight="bold")
     plt.tight_layout()
     plt.savefig("reports/figures/unet_qualitative.png", dpi=150)
-    plt.show()'''),
+    plt.show()""",
+        ),
     ]
 
-    create_notebook('notebooks/02_train_unet_segmentation.ipynb', nb2_cells)
+    create_notebook("notebooks/02_train_unet_segmentation.ipynb", nb2_cells)
 
     # =========================================================================
     # NOTEBOOK 3: Classification, XAI, Validation, Dashboard
     # =========================================================================
     nb3_cells = [
-        ('markdown', '''# 🧠 MRI Image Enhancement and Tumor Detection
+        (
+            "markdown",
+            """# 🧠 MRI Image Enhancement and Tumor Detection
 ## Notebook 3: EfficientNetB2 Classification, Grad-CAM XAI, PMRAM Validation & Live Dashboard
 **Prerequisite:** Notebooks 1 and 2 must be complete before running this notebook.
 
@@ -630,9 +680,11 @@ else:
 5. Consolidate Phase I & II reports
 6. Launch NeuroScan-Enterprise dashboard via Cloudflare tunnel
 
-> 💡 **Expected training time:** ~1–1.5 hours for all 3 experiments (30 epochs each)'''),
-
-        ('code', '''# ── Cell 1: Environment Setup & Hardware Profile ───────────────────────────
+> 💡 **Expected training time:** ~1–1.5 hours for all 3 experiments (30 epochs each)""",
+        ),
+        (
+            "code",
+            """# ── Cell 1: Environment Setup & Hardware Profile ───────────────────────────
 from __future__ import annotations
 import os, sys
 
@@ -674,9 +726,11 @@ import torch
 device = profile["device"]
 if profile["has_cuda"]:
     torch.cuda.empty_cache()
-print(f"✅ PyTorch {torch.__version__} | Device: {device} | AMP: {profile[\'use_amp\']}")'''),
-
-        ('code', '''# ── Cell 2: Verify Prerequisites (Checkpoints + Metadata) ───────────────────
+print(f"✅ PyTorch {torch.__version__} | Device: {device} | AMP: {profile[\'use_amp\']}")""",
+        ),
+        (
+            "code",
+            '''# ── Cell 2: Verify Prerequisites (Checkpoints + Metadata) ───────────────────
 import os, json
 
 def verify_experiment_quality(exp_id: str, ckpt_path: str, min_f1: float = 0.80, min_epochs: int = 20) -> bool:
@@ -730,9 +784,11 @@ with open(META_PATH) as f:
     meta = json.load(f)
 print(f"\\n✅ Classification images : {meta['classification_count']:,}")
 print(f"✅ Segmentation pairs    : {meta['segmentation_count']:,}")
-print("\\n✅ All prerequisites satisfied.")'''),
-
-        ('code', '''# ── Cell 3: Load Trained U-Net ──────────────────────────────────────────────
+print("\\n✅ All prerequisites satisfied.")''',
+        ),
+        (
+            "code",
+            """# ── Cell 3: Load Trained U-Net ──────────────────────────────────────────────
 import torch
 from segmentation.unet_model import UNet
 
@@ -746,9 +802,11 @@ unet.eval()
 
 n_params = sum(p.numel() for p in unet.parameters())
 print(f"✅ U-Net loaded: {CKPT_PATH}")
-print(f"   Parameters: {n_params:,}")'''),
-
-        ('code', '''# ── Cell 4A: Experiment 1 — Baseline (Raw Scans) ──────────────────────────────
+print(f"   Parameters: {n_params:,}")""",
+        ),
+        (
+            "code",
+            """# ── Cell 4A: Experiment 1 — Baseline (Raw Scans) ──────────────────────────────
 import os
 CKPT_EXP1 = "checkpoints/classification/best_efficientnet_exp1_baseline.pth"
 if verify_experiment_quality("exp1_baseline", CKPT_EXP1, min_f1=0.85, min_epochs=20):
@@ -764,9 +822,11 @@ else:
         _re1.main()
     finally:
         sys.argv = _orig_argv
-    print("\\n✅ Experiment 1 — COMPLETE")'''),
-
-        ('code', '''# ── Cell 4B: Experiment 2 — Enhanced Scans (WPT→LMMSE→CLAHE) ─────────────────
+    print("\\n✅ Experiment 1 — COMPLETE")""",
+        ),
+        (
+            "code",
+            """# ── Cell 4B: Experiment 2 — Enhanced Scans (WPT→LMMSE→CLAHE) ─────────────────
 import os
 CKPT_EXP2 = "checkpoints/classification/best_efficientnet_exp2_enhanced.pth"
 if verify_experiment_quality("exp2_enhanced", CKPT_EXP2, min_f1=0.80, min_epochs=20):
@@ -782,9 +842,11 @@ else:
         _re2.main()
     finally:
         sys.argv = _orig_argv
-    print("\\n✅ Experiment 2 — COMPLETE")'''),
-
-        ('code', '''# ── Cell 4C: Experiment 3 — Segmentation-Guided (RoI Crop) ───────────────────
+    print("\\n✅ Experiment 2 — COMPLETE")""",
+        ),
+        (
+            "code",
+            """# ── Cell 4C: Experiment 3 — Segmentation-Guided (RoI Crop) ───────────────────
 import os
 CKPT_EXP3 = "checkpoints/classification/best_efficientnet_exp3_seg_guided.pth"
 if verify_experiment_quality("exp3_seg_guided", CKPT_EXP3, min_f1=0.80, min_epochs=20):
@@ -800,9 +862,11 @@ else:
         _re3.main()
     finally:
         sys.argv = _orig_argv
-    print("\\n✅ Experiment 3 — COMPLETE")'''),
-
-        ('code', '''# ── Cell 5: Comparative Results Table ────────────────────────────────────────
+    print("\\n✅ Experiment 3 — COMPLETE")""",
+        ),
+        (
+            "code",
+            """# ── Cell 5: Comparative Results Table ────────────────────────────────────────
 import json, glob, os, pandas as pd
 
 rows = []
@@ -833,9 +897,11 @@ if rows:
     df.to_csv("results/summary_table.csv", index=False)
     print("\\n✅ Saved to results/summary_table.csv")
 else:
-    print("⚠️  No results found. Run Cells 4A / 4B / 4C first.")'''),
-
-        ('code', '''# ── Cell 6: Grad-CAM XAI — Heatmaps + Quantitative Localization ──────────────
+    print("⚠️  No results found. Run Cells 4A / 4B / 4C first.")""",
+        ),
+        (
+            "code",
+            """# ── Cell 6: Grad-CAM XAI — Heatmaps + Quantitative Localization ──────────────
 try:
     import pytorch_grad_cam
 except ImportError:
@@ -924,9 +990,11 @@ plt.suptitle("Grad-CAM Explainability — All 4 Tumor Classes", fontsize=14, fon
 plt.tight_layout()
 plt.savefig("reports/figures/gradcam_panel.png", dpi=150)
 plt.show()
-print("✅ Grad-CAM panel saved to reports/figures/gradcam_panel.png")'''),
-
-        ('code', '''# ── Cell 7: PMRAM External Generalization Validation ────────────────────────
+print("✅ Grad-CAM panel saved to reports/figures/gradcam_panel.png")""",
+        ),
+        (
+            "code",
+            """# ── Cell 7: PMRAM External Generalization Validation ────────────────────────
 # Zero-retraining inference on 1,600 original PMRAM scans
 import subprocess, sys
 
@@ -947,9 +1015,11 @@ else:
             pmram = json.load(f)
         print(f"\\nBRISC (Exp3) Accuracy : {pmram.get('brisc_metrics', {}).get('accuracy', 'N/A')}")
         print(f"PMRAM Accuracy        : {pmram.get('pmram_metrics', {}).get('accuracy', 'N/A')}")
-        print(f"Generalization Gap    : {pmram.get('generalization_gap', {}).get('accuracy', 'N/A')}")'''),
-
-        ('code', '''# ── Cell 8: Consolidate Reports ──────────────────────────────────────────────
+        print(f"Generalization Gap    : {pmram.get('generalization_gap', {}).get('accuracy', 'N/A')}")""",
+        ),
+        (
+            "code",
+            """# ── Cell 8: Consolidate Reports ──────────────────────────────────────────────
 import os
 try:
     from evaluation.consolidate_reports import main
@@ -959,9 +1029,11 @@ except Exception as _e:
 for rpt in ["reports/PHASE_I_EVALUATION_REPORT.md", "reports/PHASE_II_FINAL_REPORT.md"]:
     if os.path.exists(rpt):
         print(f"✅ {rpt}")
-print("\\n✅ All reports generated")'''),
-
-        ('code', '''# ── Cell 9: Launch NeuroScan-Enterprise Dashboard ───────────────────────────
+print("\\n✅ All reports generated")""",
+        ),
+        (
+            "code",
+            """# ── Cell 9: Launch NeuroScan-Enterprise Dashboard ───────────────────────────
 import subprocess, time, re, sys, os
 
 print("🚀 Launching Streamlit dashboard...")
@@ -1012,11 +1084,12 @@ else:
     print(f"  🔗 Local URL: http://localhost:8501")
     print(f"{'='*60}")
     print("\\n  Open the link in your browser to access the dashboard.")
-    print("  Keep this cell running to maintain the server.")'''),
+    print("  Keep this cell running to maintain the server.")""",
+        ),
     ]
 
-    create_notebook('notebooks/03_train_classifier_and_xai.ipynb', nb3_cells)
+    create_notebook("notebooks/03_train_classifier_and_xai.ipynb", nb3_cells)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

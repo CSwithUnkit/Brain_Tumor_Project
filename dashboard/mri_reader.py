@@ -20,6 +20,7 @@ load_medical_image(filename, data) -> dict with keys:
     volume : np.ndarray float32, shape (H, W, D) -- when kind == "volume"
     meta   : dict with format, shape, spacing, slice_count, notes
 """
+
 from __future__ import annotations
 
 import io
@@ -57,8 +58,12 @@ def _window_normalize(arr: np.ndarray) -> np.ndarray:
 def _read_standard_image(data: bytes) -> dict:
     img = Image.open(io.BytesIO(data))
     img = img.convert("L")  # grayscale; pipeline works on single-channel slices
-    meta = {"format": "image", "shape": (img.height, img.width),
-            "slice_count": 1, "notes": f"{img.width}x{img.height} {img.mode}"}
+    meta = {
+        "format": "image",
+        "shape": (img.height, img.width),
+        "slice_count": 1,
+        "notes": f"{img.width}x{img.height} {img.mode}",
+    }
     return {"kind": "slice", "image": img, "meta": meta}
 
 
@@ -115,23 +120,32 @@ def _read_dicom(data: bytes, filename: str) -> dict:
 
     if arr.ndim == 2:
         img = Image.fromarray(_window_normalize(arr))
-        meta = {"format": "DICOM", "shape": arr.shape, "slice_count": 1,
-                "spacing": spacing,
-                "notes": f"{getattr(ds, 'Modality', '?')} {arr.shape[1]}x{arr.shape[0]}"}
+        meta = {
+            "format": "DICOM",
+            "shape": arr.shape,
+            "slice_count": 1,
+            "spacing": spacing,
+            "notes": f"{getattr(ds, 'Modality', '?')} {arr.shape[1]}x{arr.shape[0]}",
+        }
         return {"kind": "slice", "image": img, "meta": meta}
     if arr.ndim == 3:
         # (Frames, H, W) -> (H, W, D)
         vol = np.transpose(arr, (1, 2, 0)).astype(np.float32)
-        meta = {"format": "DICOM multi-frame", "shape": vol.shape,
-                "slice_count": int(vol.shape[2]), "spacing": spacing,
-                "notes": f"{vol.shape[2]} frames"}
+        meta = {
+            "format": "DICOM multi-frame",
+            "shape": vol.shape,
+            "slice_count": int(vol.shape[2]),
+            "spacing": spacing,
+            "notes": f"{vol.shape[2]} frames",
+        }
         return {"kind": "volume", "volume": vol, "meta": meta}
     raise ValueError(f"{filename}: unsupported DICOM pixel shape {arr.shape}.")
 
 
 def _read_nifti(data: bytes, filename: str) -> dict:
-    import nibabel as nib
     import tempfile
+
+    import nibabel as nib
 
     # nibabel works on file paths: spill to a temp file (deleted after load).
     suffix = ".nii.gz" if filename.lower().endswith(".gz") else ".nii"
@@ -159,9 +173,13 @@ def _read_nifti(data: bytes, filename: str) -> dict:
         raise ValueError(f"{filename}: expected a 3-D NIfTI volume, got {arr.shape}.")
     # nibabel volumes are (X, Y, Z); present axial slices as (H, W, D).
     vol = np.transpose(arr, (1, 0, 2))
-    meta = {"format": "NIfTI", "shape": vol.shape,
-            "slice_count": int(vol.shape[2]), "spacing": spacing,
-            "notes": f"{vol.shape[2]} axial slices"}
+    meta = {
+        "format": "NIfTI",
+        "shape": vol.shape,
+        "slice_count": int(vol.shape[2]),
+        "spacing": spacing,
+        "notes": f"{vol.shape[2]} axial slices",
+    }
     return {"kind": "volume", "volume": vol, "meta": meta}
 
 
@@ -182,11 +200,12 @@ def load_medical_image(filename: str, data: bytes) -> dict:
             return _read_dicom(data, filename)
         if ext in _NIFTI_EXTS:
             return _read_nifti(data, filename)
-    except (ValueError, IOError, OSError) as e:
+    except (ValueError, OSError) as e:
         raise ValueError(f"Could not read {filename or 'the file'}: {e}") from e
     raise ValueError(
         f"Unsupported format '{ext or '?'}'. "
-        "Upload PNG, JPG, BMP, TIFF, WebP, DICOM (.dcm) or NIfTI (.nii/.nii.gz).")
+        "Upload PNG, JPG, BMP, TIFF, WebP, DICOM (.dcm) or NIfTI (.nii/.nii.gz)."
+    )
 
 
 def volume_slice_to_pil(volume: np.ndarray, index: int) -> Image.Image:

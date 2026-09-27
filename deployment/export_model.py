@@ -26,9 +26,9 @@ Usage (CLI)
 """
 
 import argparse
+import logging
 import os
 import sys
-import logging
 from pathlib import Path
 
 import torch
@@ -36,12 +36,14 @@ import torch
 # ── Conditional soft imports (graceful degradation) ───────────────────────────
 try:
     import onnx
+
     _ONNX_AVAILABLE = True
 except ImportError:
     _ONNX_AVAILABLE = False
 
 try:
     import onnxruntime as ort
+
     _ORT_AVAILABLE = True
 except ImportError:
     _ORT_AVAILABLE = False
@@ -50,13 +52,14 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # ── Constants ─────────────────────────────────────────────────────────────────
-CLASSIFIER_INPUT_SHAPE = (1, 3, 256, 256)   # EfficientNet-B2
-UNET_INPUT_SHAPE       = (1, 3, 256, 256)   # U-Net
-ONNX_OPSET_VERSION     = 17
-ORT_MAX_DELTA          = 1e-4               # max abs diff for numerical validation
+CLASSIFIER_INPUT_SHAPE = (1, 3, 256, 256)  # EfficientNet-B2
+UNET_INPUT_SHAPE = (1, 3, 256, 256)  # U-Net
+ONNX_OPSET_VERSION = 17
+ORT_MAX_DELTA = 1e-4  # max abs diff for numerical validation
 
 
 # ── Model factory ─────────────────────────────────────────────────────────────
+
 
 def _build_classifier() -> torch.nn.Module:
     """Instantiate BrainTumorClassifier (EfficientNetB2, 4 classes)."""
@@ -65,6 +68,7 @@ def _build_classifier() -> torch.nn.Module:
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
     from classification.classifier_model import BrainTumorClassifier
+
     return BrainTumorClassifier(num_classes=4, pretrained=False)
 
 
@@ -74,16 +78,17 @@ def _build_unet() -> torch.nn.Module:
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
     from segmentation.unet_model import UNet
+
     return UNet(n_channels=3, n_classes=1)
 
 
 def _load_model(model_type: str, checkpoint_path: str) -> tuple[torch.nn.Module, tuple]:
     """Load model from checkpoint and return (model_on_cpu, input_shape)."""
     if model_type == "classifier":
-        model      = _build_classifier()
+        model = _build_classifier()
         input_shape = CLASSIFIER_INPUT_SHAPE
     elif model_type == "unet":
-        model      = _build_unet()
+        model = _build_unet()
         input_shape = UNET_INPUT_SHAPE
     else:
         raise ValueError(f"Unknown model type '{model_type}'. Choose 'classifier' or 'unet'.")
@@ -106,6 +111,7 @@ def _load_model(model_type: str, checkpoint_path: str) -> tuple[torch.nn.Module,
 
 # ── Export functions ──────────────────────────────────────────────────────────
 
+
 def export_state_dict(model: torch.nn.Module, output_path: str) -> None:
     """
     Save a clean state-dict only checkpoint (optimizer states stripped).
@@ -115,7 +121,7 @@ def export_state_dict(model: torch.nn.Module, output_path: str) -> None:
     tmp = output_path + ".tmp"
     torch.save(model.state_dict(), tmp)
     os.replace(tmp, output_path)
-    size_mb = os.path.getsize(output_path) / (1024 ** 2)
+    size_mb = os.path.getsize(output_path) / (1024**2)
     logger.info(f"✓ State-dict saved → {output_path}  ({size_mb:.1f} MB)")
 
 
@@ -135,7 +141,7 @@ def export_torchscript(
     tmp = output_path + ".tmp"
     traced.save(tmp)
     os.replace(tmp, output_path)
-    size_mb = os.path.getsize(output_path) / (1024 ** 2)
+    size_mb = os.path.getsize(output_path) / (1024**2)
     logger.info(f"✓ TorchScript saved → {output_path}  ({size_mb:.1f} MB)")
 
 
@@ -162,15 +168,15 @@ def export_onnx(
 
     # Input/output names vary by model type
     if model_type == "classifier":
-        input_names  = ["mri_image"]
+        input_names = ["mri_image"]
         output_names = ["class_logits"]
     else:
-        input_names  = ["mri_image"]
+        input_names = ["mri_image"]
         output_names = ["tumor_mask_logits"]
 
     # Dynamic batch axis: allows arbitrary batch sizes at inference time
     dynamic_axes = {
-        input_names[0]:  {0: "batch_size"},
+        input_names[0]: {0: "batch_size"},
         output_names[0]: {0: "batch_size"},
     }
 
@@ -194,7 +200,7 @@ def export_onnx(
     logger.info("✓ ONNX graph integrity check passed")
 
     os.replace(tmp_path, output_path)
-    size_mb = os.path.getsize(output_path) / (1024 ** 2)
+    size_mb = os.path.getsize(output_path) / (1024**2)
     logger.info(f"✓ ONNX model saved → {output_path}  ({size_mb:.1f} MB)")
 
     # ── Numerical validation via ORT ───────────────────────────────────────
@@ -241,6 +247,7 @@ def _validate_onnx_vs_pytorch(
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="python -m deployment.export_model",
@@ -264,21 +271,22 @@ Examples
         """,
     )
     parser.add_argument(
-        "--model", choices=["classifier", "unet"], required=True,
-        help="Which model to export."
+        "--model", choices=["classifier", "unet"], required=True, help="Which model to export."
     )
     parser.add_argument(
-        "--checkpoint", type=str, required=True,
-        help="Path to the trained .pth checkpoint file."
+        "--checkpoint", type=str, required=True, help="Path to the trained .pth checkpoint file."
     )
     parser.add_argument(
-        "--output-dir", type=str, default="deployment/exported",
-        help="Directory to write exported files into. (default: deployment/exported/)"
+        "--output-dir",
+        type=str,
+        default="deployment/exported",
+        help="Directory to write exported files into. (default: deployment/exported/)",
     )
     parser.add_argument(
-        "--output-format", choices=["pth", "torchscript", "onnx", "all"],
+        "--output-format",
+        choices=["pth", "torchscript", "onnx", "all"],
         default="all",
-        help="Export format(s). 'all' exports pth + torchscript + onnx. (default: all)"
+        help="Export format(s). 'all' exports pth + torchscript + onnx. (default: all)",
     )
     return parser.parse_args()
 
@@ -290,7 +298,7 @@ def main() -> None:
     model, input_shape = _load_model(args.model, args.checkpoint)
 
     stem = f"{args.model}_exported"
-    fmt  = args.output_format
+    fmt = args.output_format
 
     if fmt in ("pth", "all"):
         export_state_dict(
@@ -300,13 +308,15 @@ def main() -> None:
 
     if fmt in ("torchscript", "all"):
         export_torchscript(
-            model, input_shape,
+            model,
+            input_shape,
             os.path.join(args.output_dir, f"{stem}.pt"),
         )
 
     if fmt in ("onnx", "all"):
         export_onnx(
-            model, input_shape,
+            model,
+            input_shape,
             os.path.join(args.output_dir, f"{stem}.onnx"),
             model_type=args.model,
         )

@@ -1,0 +1,78 @@
+[project]
+name = "brain-tumor-detection"
+version = "2.0.0"
+description = "Explainable deep-learning framework for brain tumor segmentation and classification (BRISC 2025)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "CSwithUnkit" }]
+dependencies = [
+    "torch>=2.0",
+    "torchvision>=0.15",
+    "numpy",
+    "opencv-python-headless",
+    "scikit-learn",
+    "pandas",
+    "matplotlib",
+    "seaborn",
+    "Pillow",
+    "pydicom",
+    "nibabel",
+    "albumentations",
+    "timm",
+    "pytorch-grad-cam>=1.4",
+    "streamlit",
+    "fpdf2",
+    "tqdm",
+    "scipy",
+    "pywavelets",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "W"]
+ignore = [
+    "E501", # line length handled by the formatter, not the linter
+    # E402: every entry-point does `sys.path.insert(0, PROJECT_ROOT)` before
+    # local imports so the package runs without installation. Deliberate,
+    # repo-wide pattern — not an import-ordering bug.
+    "E402",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Notebooks are interactive documents: setup cells import names for later
+# cells (F401), and trailing whitespace inside markdown-flavoured cells
+# (W291/W293) is harmless. The .py mirrors inherit the same treatment.
+"notebooks/*" = ["F401", "B905", "W291", "W293", "E402", "I001"]
+# These files embed Markdown templates as strings, where a trailing
+# double-space is an intentional hard line-break — not stray whitespace.
+"evaluation/consolidate_reports.py" = ["W291", "W293"]
+"generate_modular_notebooks.py" = ["W291", "W293"]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+    "classification",
+    "dashboard",
+    "data",
+    "deployment",
+    "enhancement",
+    "evaluation",
+    "explainability",
+    "reports",
+    "scripts",
+    "segmentation",
+    "utils",
+    "validation",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,31 +1,34 @@
 import argparse
-import os
-import sys
 import json
 import logging
+import os
+import random
+import sys
 import time
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Any
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR
-from torch.utils.tensorboard import SummaryWriter
-import random
-import numpy as np
-from sklearn.metrics import accuracy_score, precision_recall_fscore_support, confusion_matrix
-
+from sklearn.metrics import accuracy_score, confusion_matrix, precision_recall_fscore_support
+from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
+
 from classification.classifier_model import BrainTumorClassifier
 from classification.masking_utils import apply_soft_context_mask, apply_soft_mask
 from data.dataset_preprocessor import (
-    BRISCClassificationDataset, split_dataset, find_cached_enhanced
+    BRISCClassificationDataset,
+    find_cached_enhanced,
+    split_dataset,
 )
-from utils.device_config import get_system_execution_profile, atomic_torch_save, atomic_json_save
+from utils.device_config import atomic_json_save, atomic_torch_save, get_system_execution_profile
 
-logging.basicConfig(level=logging.INFO, format='%(message)s')
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
+
 
 def load_unet_for_exp3(unet_ckpt: str, device) -> torch.nn.Module:
     """
@@ -44,16 +47,16 @@ def load_unet_for_exp3(unet_ckpt: str, device) -> torch.nn.Module:
             f"explicitly."
         )
     from segmentation.unet_model import UNet
+
     unet_model = UNet(n_channels=3, n_classes=1).to(device)
-    unet_model.load_state_dict(
-        torch.load(unet_ckpt, map_location=device, weights_only=True)
-    )
+    unet_model.load_state_dict(torch.load(unet_ckpt, map_location=device, weights_only=True))
     unet_model.eval()
     return unet_model
 
 
-def apply_exp3_guidance(images: torch.Tensor, unet_model: torch.nn.Module,
-                        soft: bool = False) -> torch.Tensor:
+def apply_exp3_guidance(
+    images: torch.Tensor, unet_model: torch.nn.Module, soft: bool = False
+) -> torch.Tensor:
     """
     Apply segmentation-guided masking to a batch.
 
@@ -82,37 +85,58 @@ def apply_exp3_guidance(images: torch.Tensor, unet_model: torch.nn.Module,
         return apply_soft_mask(images, safe_mask_prob)
     return apply_soft_context_mask(images, safe_mask_prob)
 
+
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--experiment', type=str, required=True,
-                        choices=['exp1_baseline', 'exp2_enhanced', 'exp3_seg_guided', 'exp3_soft_masked'],
-                        help='Experiment to run.')
-    parser.add_argument('--epochs', type=int, default=25)
+    parser.add_argument(
+        "--experiment",
+        type=str,
+        required=True,
+        choices=["exp1_baseline", "exp2_enhanced", "exp3_seg_guided", "exp3_soft_masked"],
+        help="Experiment to run.",
+    )
+    parser.add_argument("--epochs", type=int, default=25)
     # Default None → fall back to dynamic hardware profile when not specified
-    parser.add_argument('--batch_size', type=int, default=None,
-                        help='Batch size. If omitted, auto-detected from hardware profile.')
-    parser.add_argument('--num_workers', type=int, default=None,
-                        help='DataLoader workers. If omitted, auto-detected from hardware profile.')
-    parser.add_argument('--lr', type=float, default=1e-4)
-    parser.add_argument('--unet_checkpoint', type=str, default=None,
-                        help='Path to trained U-Net for Exp 3 variants')
-    parser.add_argument('--in_notebook', action='store_true',
-                        help='Enable IPython-compatible in-place progress (clear_output per epoch).')
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=None,
+        help="Batch size. If omitted, auto-detected from hardware profile.",
+    )
+    parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=None,
+        help="DataLoader workers. If omitted, auto-detected from hardware profile.",
+    )
+    parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument(
+        "--unet_checkpoint", type=str, default=None, help="Path to trained U-Net for Exp 3 variants"
+    )
+    parser.add_argument(
+        "--in_notebook",
+        action="store_true",
+        help="Enable IPython-compatible in-place progress (clear_output per epoch).",
+    )
     return parser.parse_args()
 
-def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, Any]:
+
+def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, Any]:
     """Compute comprehensive multiclass metrics."""
     acc = accuracy_score(y_true, y_pred)
-    precision, recall, f1, _ = precision_recall_fscore_support(y_true, y_pred, average='macro', zero_division=0)
+    precision, recall, f1, _ = precision_recall_fscore_support(
+        y_true, y_pred, average="macro", zero_division=0
+    )
     conf_matrix = confusion_matrix(y_true, y_pred).tolist()
-    
+
     return {
-        'accuracy': acc,
-        'macro_precision': precision,
-        'macro_recall': recall,
-        'macro_f1': f1,
-        'confusion_matrix': conf_matrix
+        "accuracy": acc,
+        "macro_precision": precision,
+        "macro_recall": recall,
+        "macro_f1": f1,
+        "confusion_matrix": conf_matrix,
     }
+
 
 def seed_everything(seed: int = 42) -> None:
     """Enforce full reproducibility across all backends (FR-011, NFR-005)."""
@@ -123,6 +147,7 @@ def seed_everything(seed: int = 42) -> None:
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
+
 def main():
     args = parse_args()
     seed_everything(42)
@@ -131,11 +156,11 @@ def main():
     # Detects GPU/CPU, VRAM, RAM, and derives safe batch_size / num_workers.
     # CLI args override profile values when explicitly supplied by the user.
     profile = get_system_execution_profile()
-    device      = profile["device"]
-    batch_size  = args.batch_size  if args.batch_size  is not None else profile["batch_size"]
+    device = profile["device"]
+    batch_size = args.batch_size if args.batch_size is not None else profile["batch_size"]
     num_workers = args.num_workers if args.num_workers is not None else profile["num_workers"]
-    use_amp     = profile["use_amp"]
-    pin_memory  = profile["pin_memory"]
+    use_amp = profile["use_amp"]
+    pin_memory = profile["pin_memory"]
     # persistent_workers requires num_workers > 0 — guard the case where the
     # user explicitly passes --num_workers 0 (e.g. tiny CPU smoke runs).
     persistent_workers = profile["persistent_workers"] and num_workers > 0
@@ -146,46 +171,50 @@ def main():
         f"Batch: {batch_size} | Workers: {num_workers} | AMP: {use_amp}"
     )
     logger.info(f"ℹ️ [INFO] Running {args.experiment} on device: {device}")
-    
-    os.makedirs('checkpoints/classification', exist_ok=True)
-    os.makedirs('results', exist_ok=True)
-    
+
+    os.makedirs("checkpoints/classification", exist_ok=True)
+    os.makedirs("results", exist_ok=True)
+
     tb_dir = f"runs/{args.experiment}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     writer = SummaryWriter(tb_dir)
-    
+
     model = BrainTumorClassifier(num_classes=4, pretrained=True).to(device)
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
-    
+
     # === STAGE 1: Head Warmup (epochs 1 to WARMUP_EPOCHS) ===
     WARMUP_EPOCHS = 5
     model.freeze_feature_extractor(freeze=True)
     optimizer = optim.AdamW(
-        filter(lambda p: p.requires_grad, model.parameters()),
-        lr=1e-3, weight_decay=1e-4
+        filter(lambda p: p.requires_grad, model.parameters()), lr=1e-3, weight_decay=1e-4
     )
     scheduler = LinearLR(optimizer, start_factor=0.1, end_factor=1.0, total_iters=WARMUP_EPOCHS)
-    scaler = torch.amp.GradScaler('cuda', enabled=use_amp)
-    
-    # Load real BRISC classification data from metadata
-    meta_path = 'data/brisc/brisc_metadata.json'
-    if not os.path.exists(meta_path):
-        raise FileNotFoundError(f"BRISC metadata not found at {meta_path}. Please run: python -m data.dataset_ingestion")
+    scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
 
-    with open(meta_path, 'r') as f:
+    # Load real BRISC classification data from metadata
+    meta_path = "data/brisc/brisc_metadata.json"
+    if not os.path.exists(meta_path):
+        raise FileNotFoundError(
+            f"BRISC metadata not found at {meta_path}. Please run: python -m data.dataset_ingestion"
+        )
+
+    with open(meta_path) as f:
         brisc_meta = json.load(f)
 
-    all_records = brisc_meta.get('classification', [])
+    all_records = brisc_meta.get("classification", [])
     if len(all_records) == 0:
-        raise FileNotFoundError("0 classification images found. Please re-run python -m data.dataset_ingestion")
+        raise FileNotFoundError(
+            "0 classification images found. Please re-run python -m data.dataset_ingestion"
+        )
 
     # If Exp 2 or Exp 3, prefer enhanced cached images.
     # Fail-hard on a cache miss: silently falling back to RAW images while
     # the experiment is labeled "enhanced"/"seg-guided" would publish
     # mislabeled science (same fail-open class as the old Exp3/PMRAM bugs).
-    if args.experiment in ['exp2_enhanced', 'exp3_seg_guided', 'exp3_soft_masked']:
-        cache_dir = 'data/cached_enhanced'
-        missing = [rec['path'] for rec in all_records
-                   if not find_cached_enhanced(rec['path'], cache_dir)]
+    if args.experiment in ["exp2_enhanced", "exp3_seg_guided", "exp3_soft_masked"]:
+        cache_dir = "data/cached_enhanced"
+        missing = [
+            rec["path"] for rec in all_records if not find_cached_enhanced(rec["path"], cache_dir)
+        ]
         if missing:
             raise FileNotFoundError(
                 f"{len(missing)} image(s) have no entry in {cache_dir} "
@@ -195,41 +224,54 @@ def main():
                 f"train an 'enhanced' experiment on raw images."
             )
         for rec in all_records:
-            rec['path'] = find_cached_enhanced(rec['path'], cache_dir)
+            rec["path"] = find_cached_enhanced(rec["path"], cache_dir)
 
     # Stratified 70/15/15 train/val/test split (reuses the shared helper so
     # every training script splits identically). The test set is NEVER used
     # for training or model selection — only for the final report.
     # NOTE: splits are image-level; if the dataset contains multiple slices
     # per patient, prefer a patient-grouped split to avoid leakage.
-    class_to_idx = {'glioma': 0, 'meningioma': 1, 'pituitary': 2, 'no_tumor': 3}
+    class_to_idx = {"glioma": 0, "meningioma": 1, "pituitary": 2, "no_tumor": 3}
     train_records, val_records, test_records = split_dataset(
-        all_records, stratify_col='class', random_state=42
+        all_records, stratify_col="class", random_state=42
     )
 
-    train_dataset = BRISCClassificationDataset(train_records, split='train', class_to_idx=class_to_idx)
-    val_dataset   = BRISCClassificationDataset(val_records,   split='val',   class_to_idx=class_to_idx)
-    test_dataset  = BRISCClassificationDataset(test_records,  split='test',  class_to_idx=class_to_idx)
+    train_dataset = BRISCClassificationDataset(
+        train_records, split="train", class_to_idx=class_to_idx
+    )
+    val_dataset = BRISCClassificationDataset(val_records, split="val", class_to_idx=class_to_idx)
+    test_dataset = BRISCClassificationDataset(test_records, split="test", class_to_idx=class_to_idx)
 
     # DataLoader: use hardware-profile-derived values for safe cross-platform operation.
     train_loader = DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=True,
-        pin_memory=pin_memory, num_workers=num_workers,
-        persistent_workers=persistent_workers
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        pin_memory=pin_memory,
+        num_workers=num_workers,
+        persistent_workers=persistent_workers,
     )
     val_loader = DataLoader(
-        val_dataset, batch_size=batch_size, shuffle=False,
-        pin_memory=pin_memory, num_workers=num_workers,
-        persistent_workers=persistent_workers
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        pin_memory=pin_memory,
+        num_workers=num_workers,
+        persistent_workers=persistent_workers,
     )
     test_loader = DataLoader(
-        test_dataset, batch_size=batch_size, shuffle=False,
-        pin_memory=pin_memory, num_workers=num_workers,
-        persistent_workers=persistent_workers
+        test_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        pin_memory=pin_memory,
+        num_workers=num_workers,
+        persistent_workers=persistent_workers,
     )
 
-    logger.info(f"ℹ️ [INFO] Train: {len(train_dataset)} | Val: {len(val_dataset)} | Test: {len(test_dataset)} samples")
-    
+    logger.info(
+        f"ℹ️ [INFO] Train: {len(train_dataset)} | Val: {len(val_dataset)} | Test: {len(test_dataset)} samples"
+    )
+
     best_val_f1 = 0.0
     history = []
 
@@ -239,26 +281,35 @@ def main():
     # data the U-Net has already seen. For a leak-free Exp3, train the U-Net
     # on a disjoint patient cohort. The masking itself is still applied
     # identically in train/val/test (see apply_exp3_guidance).
-    use_soft_mask = (args.experiment == 'exp3_soft_masked')
-    unet_model: Optional[torch.nn.Module] = None
-    if args.experiment in ('exp3_seg_guided', 'exp3_soft_masked'):
-        unet_ckpt = args.unet_checkpoint or 'checkpoints/unet/best_unet_enhanced.pth'
+    use_soft_mask = args.experiment == "exp3_soft_masked"
+    unet_model: torch.nn.Module | None = None
+    if args.experiment in ("exp3_seg_guided", "exp3_soft_masked"):
+        unet_ckpt = args.unet_checkpoint or "checkpoints/unet/best_unet_enhanced.pth"
         unet_model = load_unet_for_exp3(unet_ckpt, device)
         logger.info(f"ℹ️ [INFO] Exp3: U-Net loaded from {unet_ckpt} (soft_mask={use_soft_mask})")
-    
+
     for epoch in range(1, args.epochs + 1):
         if epoch == WARMUP_EPOCHS + 1:
-            logger.info("ℹ️ [INFO] ==> Stage 2: Unfreezing top backbone blocks for differential fine-tuning")
+            logger.info(
+                "ℹ️ [INFO] ==> Stage 2: Unfreezing top backbone blocks for differential fine-tuning"
+            )
             model.freeze_feature_extractor(freeze=False)
-            optimizer = optim.AdamW([
-                {'params': [p for n, p in model.model.named_parameters()
-                            if 'classifier' not in n], 'lr': 1e-5},
-                {'params': model.model.classifier.parameters(), 'lr': 1e-4},
-            ], weight_decay=1e-4)
+            optimizer = optim.AdamW(
+                [
+                    {
+                        "params": [
+                            p for n, p in model.model.named_parameters() if "classifier" not in n
+                        ],
+                        "lr": 1e-5,
+                    },
+                    {"params": model.model.classifier.parameters(), "lr": 1e-4},
+                ],
+                weight_decay=1e-4,
+            )
             scheduler = CosineAnnealingLR(
                 optimizer, T_max=args.epochs - WARMUP_EPOCHS, eta_min=1e-6
             )
-            
+
         # Training
         model.train()
         train_loss = 0.0
@@ -287,7 +338,7 @@ def main():
 
             # In-place single-line progress: update every 10 batches
             if (batch_idx + 1) % 10 == 0 or (batch_idx + 1) == len(train_loader):
-                batches_done  = batch_idx + 1
+                batches_done = batch_idx + 1
                 elapsed_so_far = time.time() - t_epoch_start
                 eta = elapsed_so_far / batches_done * (len(train_loader) - batches_done)
                 progress = int(30 * batches_done / len(train_loader))
@@ -301,13 +352,13 @@ def main():
 
         train_loss /= len(train_loader)
         scheduler.step()
-        
+
         # Validation
         model.eval()
         val_loss = 0.0
         all_preds = []
         all_labels = []
-        
+
         with torch.no_grad():
             for images, labels in val_loader:
                 images, labels = images.to(device), labels.to(device)
@@ -318,46 +369,50 @@ def main():
                 if unet_model is not None:
                     images = apply_exp3_guidance(images, unet_model, soft=use_soft_mask)
 
-                with torch.amp.autocast(device_type=device.type, dtype=torch.float16, enabled=use_amp):
+                with torch.amp.autocast(
+                    device_type=device.type, dtype=torch.float16, enabled=use_amp
+                ):
                     logits = model(images)
                     loss = criterion(logits, labels)
-                    
+
                 val_loss += loss.item()
                 preds = torch.argmax(logits, dim=1)
                 all_preds.extend(preds.cpu().numpy())
                 all_labels.extend(labels.cpu().numpy())
-                
+
         val_loss /= len(val_loader)
         metrics = compute_metrics(np.array(all_labels), np.array(all_preds))
-        val_acc = metrics['accuracy']
-        val_f1 = metrics['macro_f1']
+        val_acc = metrics["accuracy"]
+        val_f1 = metrics["macro_f1"]
 
         elapsed = time.time() - t_epoch_start
         # End-of-epoch: overwrite in-progress bar with the finalized summary
         sys.stdout.write(
             f"\rEpoch {epoch:02d}/{args.epochs:02d} — "
             f"Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | "
-            f"Val Acc: {val_acc*100:.2f}% | Macro F1: {val_f1*100:.2f}% | Time: {elapsed:.1f}s\n"
+            f"Val Acc: {val_acc * 100:.2f}% | Macro F1: {val_f1 * 100:.2f}% | Time: {elapsed:.1f}s\n"
         )
         sys.stdout.flush()
 
-        logger.info(f"ℹ️ [INFO] Epoch {epoch}: Train Loss {train_loss:.4f} | Val Loss {val_loss:.4f} | Val Acc {val_acc:.4f} | Val F1 {val_f1:.4f}")
-        
-        writer.add_scalar('Loss/Train', train_loss, epoch)
-        writer.add_scalar('Loss/Val', val_loss, epoch)
-        writer.add_scalar('Metric/Accuracy', val_acc, epoch)
-        writer.add_scalar('Metric/MacroF1', val_f1, epoch)
-        
+        logger.info(
+            f"ℹ️ [INFO] Epoch {epoch}: Train Loss {train_loss:.4f} | Val Loss {val_loss:.4f} | Val Acc {val_acc:.4f} | Val F1 {val_f1:.4f}"
+        )
+
+        writer.add_scalar("Loss/Train", train_loss, epoch)
+        writer.add_scalar("Loss/Val", val_loss, epoch)
+        writer.add_scalar("Metric/Accuracy", val_acc, epoch)
+        writer.add_scalar("Metric/MacroF1", val_f1, epoch)
+
         if val_f1 > best_val_f1:
             best_val_f1 = val_f1
             # Atomic save: prevents checkpoint corruption on Google Drive sync folders
             ckpt_path = f"checkpoints/classification/best_efficientnet_{args.experiment}.pth"
             atomic_torch_save(model.state_dict(), ckpt_path)
             logger.info(f"  ✅ [SUCCESS] New best F1={val_f1:.4f} checkpoint saved (atomic)")
-            
-        history.append({'epoch': epoch, 'val_metrics': metrics})
-        
-        if device.type == 'cuda':
+
+        history.append({"epoch": epoch, "val_metrics": metrics})
+
+        if device.type == "cuda":
             torch.cuda.empty_cache()
 
     # Atomic JSON save: prevents partial-write corruption on synced drives
@@ -371,7 +426,9 @@ def main():
         model.load_state_dict(torch.load(best_ckpt_path, map_location=device, weights_only=True))
         logger.info(f"ℹ️ [INFO] Loaded best checkpoint for test evaluation: {best_ckpt_path}")
     else:
-        logger.warning("⚠️ [WARN] No best checkpoint found; evaluating final-epoch weights on test set.")
+        logger.warning(
+            "⚠️ [WARN] No best checkpoint found; evaluating final-epoch weights on test set."
+        )
     model.eval()
     test_preds, test_labels = [], []
     with torch.no_grad():
@@ -384,7 +441,7 @@ def main():
             test_preds.extend(torch.argmax(logits, dim=1).cpu().numpy())
             test_labels.extend(labels.cpu().numpy())
     test_metrics = compute_metrics(np.array(test_labels), np.array(test_preds))
-    test_metrics['num_test_samples'] = len(test_dataset)
+    test_metrics["num_test_samples"] = len(test_dataset)
     atomic_json_save(test_metrics, f"results/metrics_{args.experiment}_test.json")
     logger.info(
         f"✅ [SUCCESS] Held-out TEST — Acc: {test_metrics['accuracy']:.4f} | "
@@ -393,5 +450,6 @@ def main():
 
     writer.close()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

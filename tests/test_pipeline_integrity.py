@@ -7,6 +7,7 @@ M4 (Phase I protocol documentation), M5/M6/M7 (ingestion determinism,
 mask-pairing collisions, case-insensitive dedup), and the cache fail-hard
 (exp2/exp3/U-Net must train on enhanced images, never silently raw).
 """
+
 import json
 import os
 import sys
@@ -18,19 +19,19 @@ import torch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from classification.masking_utils import apply_exp3_guidance_numpy
+from classification.run_experiments import apply_exp3_guidance, load_unet_for_exp3
+from data.dataset_ingestion import DatasetIngestor
+from data.dataset_preprocessor import find_cached_enhanced
 from validation.external_pmram import (
     PMRAMValidator,
     _folder_to_class,
     _preprocess_image,
     _sha256_of_file,
 )
-from classification.run_experiments import load_unet_for_exp3, apply_exp3_guidance
-from classification.masking_utils import apply_exp3_guidance_numpy
-from data.dataset_preprocessor import find_cached_enhanced
-from data.dataset_ingestion import DatasetIngestor
-
 
 # ── C1: PMRAM preprocessing matches the model's training distribution ────────
+
 
 def _dummy_bgr():
     rng = np.random.default_rng(3)
@@ -41,6 +42,7 @@ def _dummy_bgr():
 
 def test_pmram_preprocess_enhanced_matches_training_pipeline():
     from enhancement.pipeline import EnhancementAblationManager
+
     img = _dummy_bgr()
     enhancer = EnhancementAblationManager()
     got = _preprocess_image(img, enhanced=True, enhancer=enhancer)
@@ -59,6 +61,7 @@ def test_pmram_preprocess_enhanced_matches_training_pipeline():
 
 def test_pmram_preprocess_enhanced_differs_from_raw():
     from enhancement.pipeline import EnhancementAblationManager
+
     img = _dummy_bgr()
     enhancer = EnhancementAblationManager()
     raw = _preprocess_image(img, enhanced=False)
@@ -74,15 +77,16 @@ def test_pmram_preprocess_enhanced_without_pipeline_is_a_bug():
 
 def test_pmram_validator_rejects_bad_preprocessing_arg(tmp_path):
     with pytest.raises(ValueError):
-        PMRAMValidator("m.pth", "x.csv", "y.json", pmram_root=str(tmp_path),
-                       preprocessing="sometimes")
+        PMRAMValidator(
+            "m.pth", "x.csv", "y.json", pmram_root=str(tmp_path), preprocessing="sometimes"
+        )
 
 
 # ── C3: PMRAM fails hard on missing checkpoint; records provenance ───────────
 
+
 def test_pmram_load_model_fails_hard_on_missing_checkpoint(tmp_path):
-    v = PMRAMValidator("/nonexistent/model.pth", "x.csv", "y.json",
-                       pmram_root=str(tmp_path))
+    v = PMRAMValidator("/nonexistent/model.pth", "x.csv", "y.json", pmram_root=str(tmp_path))
     with pytest.raises(FileNotFoundError):
         v.load_model()
 
@@ -91,6 +95,7 @@ def test_sha256_of_file(tmp_path):
     p = tmp_path / "ckpt.bin"
     p.write_bytes(b"fake-checkpoint-bytes")
     import hashlib
+
     assert _sha256_of_file(str(p)) == hashlib.sha256(b"fake-checkpoint-bytes").hexdigest()
 
 
@@ -109,6 +114,7 @@ def test_folder_to_class_abnormal_is_not_no_tumor():
 
 # ── C2: Exp3 fails hard without a U-Net checkpoint ───────────────────────────
 
+
 def test_exp3_unet_loader_fails_hard(tmp_path):
     device = torch.device("cpu")
     with pytest.raises(FileNotFoundError):
@@ -116,6 +122,7 @@ def test_exp3_unet_loader_fails_hard(tmp_path):
 
 
 # ── M1: dashboard Exp3 guidance == training guidance (train/serve parity) ───
+
 
 def _synthetic_case(seed=0, tumor=True):
     rng = np.random.default_rng(seed)
@@ -131,6 +138,7 @@ def _synthetic_case(seed=0, tumor=True):
 def test_exp3_guidance_numpy_matches_torch_training():
     """The dashboard's numpy path must be bit-identical to training's torch path."""
     from segmentation.unet_model import UNet
+
     mean = np.array([0.485, 0.456, 0.406], np.float32)
     std = np.array([0.229, 0.224, 0.225], np.float32)
 
@@ -139,19 +147,21 @@ def test_exp3_guidance_numpy_matches_torch_training():
 
     for seed, tumor in [(0, True), (1, False)]:
         enh, _ = _synthetic_case(seed, tumor)
-        tensor = torch.from_numpy(
-            ((enh.astype(np.float32) / 255.0 - mean) / std).transpose(2, 0, 1)
-        ).float().unsqueeze(0)
+        tensor = (
+            torch.from_numpy(((enh.astype(np.float32) / 255.0 - mean) / std).transpose(2, 0, 1))
+            .float()
+            .unsqueeze(0)
+        )
         with torch.no_grad():
             mask_prob_t = torch.sigmoid(unet(tensor))  # (1,1,256,256)
 
         torch_out = apply_exp3_guidance(tensor, unet, soft=False)
-        numpy_out = apply_exp3_guidance_numpy(
-            enh, mask_prob_t.squeeze().numpy(), mean, std)
+        numpy_out = apply_exp3_guidance_numpy(enh, mask_prob_t.squeeze().numpy(), mean, std)
 
         assert torch_out.shape == (1, 3, 256, 256)
-        assert np.allclose(torch_out.numpy(), numpy_out, atol=1e-5), \
+        assert np.allclose(torch_out.numpy(), numpy_out, atol=1e-5), (
             f"train/serve mismatch (tumor={tumor})"
+        )
 
 
 def test_exp3_guidance_empty_mask_passes_through_unmasked():
@@ -165,8 +175,9 @@ def test_exp3_guidance_empty_mask_passes_through_unmasked():
 
     numpy_out = apply_exp3_guidance_numpy(enh, tiny, mean, std)
     plain = ((enh.astype(np.float32) / 255.0 - mean) / std).transpose(2, 0, 1)[None]
-    assert np.allclose(numpy_out, plain, atol=1e-6), \
+    assert np.allclose(numpy_out, plain, atol=1e-6), (
         "dashboard darkened an image with a near-empty mask"
+    )
 
     # Torch path with a stub U-Net emitting the same tiny mask.
     class TinyUNet(torch.nn.Module):
@@ -174,13 +185,16 @@ def test_exp3_guidance_empty_mask_passes_through_unmasked():
             with np.errstate(divide="ignore"):
                 logit = np.log(tiny / np.clip(1 - tiny, 1e-6, None)).astype(np.float32)
             return torch.from_numpy(logit)[None, None]
+
     tensor = torch.from_numpy(plain).float()
     torch_out = apply_exp3_guidance(tensor, TinyUNet(), soft=False)
-    assert np.allclose(torch_out.numpy(), plain, atol=1e-5), \
+    assert np.allclose(torch_out.numpy(), plain, atol=1e-5), (
         "training darkened an image with a near-empty mask"
+    )
 
 
 # ── M5/M6/M7: ingestion determinism, collisions, dedup ──────────────────────
+
 
 @pytest.fixture()
 def fake_brisc(tmp_path, monkeypatch):
@@ -222,6 +236,7 @@ def test_ingestion_duplicate_mask_stem_fails_loud(fake_brisc):
 
 # ── Cache: legacy flat layout is untrusted; misses fail hard ────────────────
 
+
 def test_find_cached_enhanced_ignores_legacy_flat(tmp_path, monkeypatch):
     cache = tmp_path / "cached_enhanced"
     cache.mkdir()
@@ -236,19 +251,33 @@ def test_find_cached_enhanced_structured_hit(tmp_path, monkeypatch):
     cache.mkdir(parents=True)
     (cache / "img_001.jpg").write_bytes(b"junk")
     monkeypatch.chdir(tmp_path)
-    hit = find_cached_enhanced("data/brisc/glioma/img_001.jpg",
-                               str(tmp_path / "cached_enhanced"))
+    hit = find_cached_enhanced("data/brisc/glioma/img_001.jpg", str(tmp_path / "cached_enhanced"))
     assert hit is not None and hit.endswith(os.path.join("glioma", "img_001.jpg"))
 
 
 # ── M2/M4: reports consume held-out test metrics; honest provenance ─────────
 
+
 def _write_hist(path, acc, f1, epoch=3):
     hist = [
-        {"epoch": 1, "val_metrics": {"accuracy": acc - 0.02, "macro_f1": f1 - 0.02,
-                                     "macro_precision": 0.9, "macro_recall": 0.9}},
-        {"epoch": epoch, "val_metrics": {"accuracy": acc, "macro_f1": f1,
-                                         "macro_precision": 0.9, "macro_recall": 0.9}},
+        {
+            "epoch": 1,
+            "val_metrics": {
+                "accuracy": acc - 0.02,
+                "macro_f1": f1 - 0.02,
+                "macro_precision": 0.9,
+                "macro_recall": 0.9,
+            },
+        },
+        {
+            "epoch": epoch,
+            "val_metrics": {
+                "accuracy": acc,
+                "macro_f1": f1,
+                "macro_precision": 0.9,
+                "macro_recall": 0.9,
+            },
+        },
     ]
     with open(path, "w") as f:
         json.dump(hist, f)
@@ -256,17 +285,28 @@ def _write_hist(path, acc, f1, epoch=3):
 
 def test_phase2_report_uses_test_metrics_and_clean_provenance(tmp_path):
     from evaluation.consolidate_reports import ReportConsolidator
+
     r = tmp_path / "results"
     r.mkdir()
     _write_hist(r / "metrics_exp1_baseline.json", 0.97, 0.96)
     _write_hist(r / "metrics_exp2_enhanced.json", 0.96, 0.95)
     _write_hist(r / "metrics_exp3_seg_guided.json", 0.90, 0.89)
-    for exp, acc in [("exp1_baseline", 0.965), ("exp2_enhanced", 0.955),
-                     ("exp3_seg_guided", 0.895)]:
+    for exp, acc in [
+        ("exp1_baseline", 0.965),
+        ("exp2_enhanced", 0.955),
+        ("exp3_seg_guided", 0.895),
+    ]:
         with open(r / f"metrics_{exp}_test.json", "w") as f:
-            json.dump({"accuracy": acc, "macro_f1": acc - 0.01,
-                       "macro_precision": 0.9, "macro_recall": 0.9,
-                       "num_test_samples": 100}, f)
+            json.dump(
+                {
+                    "accuracy": acc,
+                    "macro_f1": acc - 0.01,
+                    "macro_precision": 0.9,
+                    "macro_recall": 0.9,
+                    "num_test_samples": 100,
+                },
+                f,
+            )
 
     ReportConsolidator(project_root=str(tmp_path)).generate_phase2_report()
     md = (tmp_path / "reports" / "PHASE_II_FINAL_REPORT.md").read_text()
@@ -278,6 +318,7 @@ def test_phase2_report_uses_test_metrics_and_clean_provenance(tmp_path):
 
 def test_phase2_report_warns_without_test_metrics(tmp_path):
     from evaluation.consolidate_reports import ReportConsolidator
+
     r = tmp_path / "results"
     r.mkdir()
     _write_hist(r / "metrics_exp1_baseline.json", 0.97, 0.96)
@@ -290,6 +331,7 @@ def test_phase2_report_warns_without_test_metrics(tmp_path):
 
 def test_phase1_report_documents_real_protocol(tmp_path):
     from evaluation.consolidate_reports import ReportConsolidator
+
     r = tmp_path / "results"
     r.mkdir()
     _write_hist(r / "metrics_exp1_baseline.json", 0.97, 0.96)
@@ -297,8 +339,15 @@ def test_phase1_report_documents_real_protocol(tmp_path):
     meta_dir = tmp_path / "data" / "brisc"
     meta_dir.mkdir(parents=True)
     with open(meta_dir / "brisc_metadata.json", "w") as f:
-        json.dump({"classification_count": 6123, "segmentation_count": 4793,
-                   "classification": [], "segmentation": []}, f)
+        json.dump(
+            {
+                "classification_count": 6123,
+                "segmentation_count": 4793,
+                "classification": [],
+                "segmentation": [],
+            },
+            f,
+        )
 
     ReportConsolidator(project_root=str(tmp_path)).generate_phase1_report()
     md = (tmp_path / "reports" / "PHASE_I_EVALUATION_REPORT.md").read_text()

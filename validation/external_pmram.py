@@ -1,35 +1,34 @@
-import os
 import json
 import logging
+import os
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 import cv2
-import pandas as pd
 import numpy as np
+import pandas as pd
 import torch
 import tqdm
 
 from classification.classifier_model import BrainTumorClassifier
 from classification.run_experiments import compute_metrics
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # ImageNet normalization constants — must match training preprocessing
 _MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-_STD  = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
 # ── Folder-name → class-index mapping (case-insensitive substring match) ──────
 # Each tuple: (substring_to_match_lowercase, class_index)
 # Checked in order; first match wins.
-_FOLDER_CLASS_RULES: List[Tuple[str, int]] = [
-    ("glioma",      0),   # covers glioma, 512Glioma, Glioma, glioma_tumor …
-    ("meningioma",  1),   # covers meningioma, 512Meningioma …
-    ("pituitary",   2),   # covers pituitary, 512Pituitary …
-    ("no_tumor",    3),   # covers no_tumor, 512No_Tumor …
-    ("notumor",     3),   # covers notumor (no separator variant)
-    ("normal",      3),   # covers normal / healthy folders
+_FOLDER_CLASS_RULES: list[tuple[str, int]] = [
+    ("glioma", 0),  # covers glioma, 512Glioma, Glioma, glioma_tumor …
+    ("meningioma", 1),  # covers meningioma, 512Meningioma …
+    ("pituitary", 2),  # covers pituitary, 512Pituitary …
+    ("no_tumor", 3),  # covers no_tumor, 512No_Tumor …
+    ("notumor", 3),  # covers notumor (no separator variant)
+    ("normal", 3),  # covers normal / healthy folders
 ]
 
 _IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"}
@@ -38,6 +37,7 @@ _IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"}
 def _sha256_of_file(path: str, chunk: int = 1 << 20) -> str:
     """SHA-256 hex digest of a file (checkpoint provenance)."""
     import hashlib
+
     h = hashlib.sha256()
     with open(path, "rb") as f:
         for block in iter(lambda: f.read(chunk), b""):
@@ -45,7 +45,7 @@ def _sha256_of_file(path: str, chunk: int = 1 << 20) -> str:
     return h.hexdigest()
 
 
-def _folder_to_class(folder_name: str) -> Optional[int]:
+def _folder_to_class(folder_name: str) -> int | None:
     """
     Map a PMRAM folder name to a class index using case-insensitive substring
     matching. Returns None if no rule matches (folder should be skipped).
@@ -55,9 +55,7 @@ def _folder_to_class(folder_name: str) -> Optional[int]:
     # (a tumor class). Without this, an "abnormal/..." folder would be
     # silently labeled no_tumor (class 3). Skip such ambiguous folders unless
     # a specific tumor class also matches.
-    if "abnormal" in lower and not any(
-        s in lower for s, _ in _FOLDER_CLASS_RULES[:3]
-    ):
+    if "abnormal" in lower and not any(s in lower for s, _ in _FOLDER_CLASS_RULES[:3]):
         return None
     for substring, class_idx in _FOLDER_CLASS_RULES:
         if substring in lower:
@@ -71,8 +69,7 @@ def _is_augmented(path: str) -> bool:
     return "augmented" in lower
 
 
-def _preprocess_image(img_bgr: np.ndarray, enhanced: bool = True,
-                      enhancer=None) -> torch.Tensor:
+def _preprocess_image(img_bgr: np.ndarray, enhanced: bool = True, enhancer=None) -> torch.Tensor:
     """
     BGR uint8 → (1, 3, 256, 256) float32 tensor with ImageNet normalisation.
 
@@ -93,7 +90,7 @@ def _preprocess_image(img_bgr: np.ndarray, enhanced: bool = True,
             )
         img_rs = enhancer.process(img_rs)  # float32 [0, 1], same as training cache
         img_rs = np.clip(img_rs, 0.0, 1.0)
-    img_norm = (img_rs - _MEAN) / _STD                  # (256, 256, 3)
+    img_norm = (img_rs - _MEAN) / _STD  # (256, 256, 3)
     tensor = torch.from_numpy(img_norm.transpose(2, 0, 1)).unsqueeze(0)  # (1,3,256,256)
     return tensor
 
@@ -109,20 +106,21 @@ class PMRAMValidator:
       2. Metadata-CSV mode (legacy / unit-test compatible):
          Falls back to reading pmram_meta_path CSV with a 'provenance' column.
     """
+
     def __init__(
         self,
         model_path: str,
         pmram_meta_path: str,
         brisc_metrics_path: str,
-        pmram_root: Optional[str] = None,
+        pmram_root: str | None = None,
         preprocessing: str = "enhanced",
     ):
         if preprocessing not in ("enhanced", "raw"):
             raise ValueError(f"preprocessing must be 'enhanced' or 'raw', got {preprocessing!r}")
-        self.model_path        = model_path
-        self.pmram_meta_path   = pmram_meta_path
+        self.model_path = model_path
+        self.pmram_meta_path = pmram_meta_path
         self.brisc_metrics_path = brisc_metrics_path
-        self.preprocessing     = preprocessing
+        self.preprocessing = preprocessing
 
         # Sanity: the preprocessing must match the model's training
         # distribution. exp1_baseline trained on raw images; exp2_enhanced and
@@ -142,11 +140,13 @@ class PMRAMValidator:
         self.enhancer = None
         if preprocessing == "enhanced":
             from enhancement.pipeline import EnhancementAblationManager
+
             self.enhancer = EnhancementAblationManager()  # WPT→LMMSE→CLAHE, same as training
 
         from utils.device_config import get_system_execution_profile
+
         profile = get_system_execution_profile()
-        self.device = profile['device']
+        self.device = profile["device"]
 
         # Auto-detect pmram_root from pmram_meta_path if not supplied
         if pmram_root is not None:
@@ -154,9 +154,9 @@ class PMRAMValidator:
         else:
             # Heuristic: parent of the CSV is the PMRAM root
             self.pmram_root = str(Path(pmram_meta_path).parent)
-            
-        if os.path.exists(os.path.join(self.pmram_root, 'original')):
-            self.pmram_root = os.path.join(self.pmram_root, 'original')
+
+        if os.path.exists(os.path.join(self.pmram_root, "original")):
+            self.pmram_root = os.path.join(self.pmram_root, "original")
 
     # ------------------------------------------------------------------
     def load_model(self) -> BrainTumorClassifier:
@@ -171,7 +171,9 @@ class PMRAMValidator:
             )
 
         model = BrainTumorClassifier(num_classes=4, pretrained=False)
-        model.load_state_dict(torch.load(self.model_path, map_location=self.device, weights_only=True))
+        model.load_state_dict(
+            torch.load(self.model_path, map_location=self.device, weights_only=True)
+        )
         logger.info(f"Loaded classifier from {self.model_path}")
         model.to(self.device)
         model.eval()
@@ -185,14 +187,14 @@ class PMRAMValidator:
 
         df = pd.read_csv(self.pmram_meta_path)
 
-        if 'provenance' not in df.columns:
+        if "provenance" not in df.columns:
             raise ValueError(
                 f"PMRAM metadata {self.pmram_meta_path} has no 'provenance' "
                 f"column (found: {list(df.columns)}). Cannot separate original "
                 "from augmented images."
             )
 
-        original_df    = df[df['provenance'] == 'original'].copy()
+        original_df = df[df["provenance"] == "original"].copy()
         augmented_count = len(df) - len(original_df)
 
         if augmented_count > 0:
@@ -207,7 +209,7 @@ class PMRAMValidator:
         return original_df
 
     # ------------------------------------------------------------------
-    def load_pmram_from_folder(self) -> List[Tuple[str, int]]:
+    def load_pmram_from_folder(self) -> list[tuple[str, int]]:
         """
         Walk self.pmram_root, map sub-folder names to class indices, and
         return a list of (image_path, class_index) for non-augmented images.
@@ -220,16 +222,16 @@ class PMRAMValidator:
 
         Strictly rejects paths containing 'augmented' (case-insensitive).
         """
-        samples: List[Tuple[str, int]] = []
-        class_counts: Dict[int, int]   = {0: 0, 1: 0, 2: 0, 3: 0}
+        samples: list[tuple[str, int]] = []
+        class_counts: dict[int, int] = {0: 0, 1: 0, 2: 0, 3: 0}
 
         if not os.path.isdir(self.pmram_root):
             logger.warning(f"PMRAM root not found: {self.pmram_root}. Falling back to CSV mode.")
             return []
 
-        for dirpath, dirnames, filenames in os.walk(self.pmram_root):
+        for dirpath, _dirnames, filenames in os.walk(self.pmram_root):
             folder_name = os.path.basename(dirpath)
-            class_idx   = _folder_to_class(folder_name)
+            class_idx = _folder_to_class(folder_name)
             if class_idx is None:
                 continue  # skip non-class directories (root, intermediate dirs)
 
@@ -260,7 +262,7 @@ class PMRAMValidator:
         return samples
 
     # ------------------------------------------------------------------
-    def load_brisc_metrics(self) -> Dict[str, float]:
+    def load_brisc_metrics(self) -> dict[str, float]:
         """
         Load BRISC validation metrics for generalization-gap calculation.
 
@@ -271,29 +273,30 @@ class PMRAMValidator:
         """
         candidates = [
             self.brisc_metrics_path,
-            'results/metrics_exp3_seg_guided.json',
-            'results/metrics_exp1_baseline.json',
+            "results/metrics_exp3_seg_guided.json",
+            "results/metrics_exp1_baseline.json",
         ]
 
         for path in candidates:
             if not path or not os.path.exists(path):
                 continue
             try:
-                with open(path, 'r') as f:
+                with open(path) as f:
                     history = json.load(f)
                 if not history:
                     continue
                 # History may be a list of per-epoch dicts (pick best) or a
                 # single final-metrics dict (e.g. *_test.json).
                 if isinstance(history, list):
+
                     def _score(h: dict) -> tuple:
-                        m = h.get('val_metrics', {}) or {}
-                        return (m.get('macro_f1', 0.0), m.get('accuracy', 0.0))
+                        m = h.get("val_metrics", {}) or {}
+                        return (m.get("macro_f1", 0.0), m.get("accuracy", 0.0))
+
                     best = max(history, key=_score)
-                    metrics = best.get('val_metrics', {})
+                    metrics = best.get("val_metrics", {})
                 elif isinstance(history, dict):
-                    metrics = {k: v for k, v in history.items()
-                               if isinstance(v, (int, float))}
+                    metrics = {k: v for k, v in history.items() if isinstance(v, (int, float))}
                 else:
                     continue
                 if metrics:
@@ -310,7 +313,7 @@ class PMRAMValidator:
     def validate(self) -> None:
         logger.info("Starting PMRAM External Validation...")
 
-        model        = self.load_model()
+        model = self.load_model()
         brisc_metrics = self.load_brisc_metrics()
 
         # ── Choose data source ─────────────────────────────────────────
@@ -319,8 +322,8 @@ class PMRAMValidator:
 
         if use_folder_mode:
             logger.info(f"Using folder-walk mode: {len(folder_samples)} images found.")
-            all_preds:  List[int] = []
-            all_labels: List[int] = []
+            all_preds: list[int] = []
+            all_labels: list[int] = []
             errors = 0
 
             with torch.no_grad():
@@ -337,7 +340,7 @@ class PMRAMValidator:
                         enhancer=self.enhancer,
                     ).to(self.device)
 
-                    with torch.amp.autocast('cuda', enabled=self.device.type == 'cuda'):
+                    with torch.amp.autocast("cuda", enabled=self.device.type == "cuda"):
                         logits = model(tensor)
 
                     pred = torch.argmax(logits, dim=1).item()
@@ -365,51 +368,63 @@ class PMRAMValidator:
         metrics = compute_metrics(np.array(all_labels), np.array(all_preds))
 
         # ── Generalization gap (Delta = BRISC − PMRAM) ─────────────────
-        gap: Dict[str, float] = {}
+        gap: dict[str, float] = {}
         for k, v in brisc_metrics.items():
             if k in metrics and isinstance(v, (int, float)):
                 gap[k] = float(v - metrics[k])
 
         results = {
-            'pmram_metrics':          metrics,
-            'brisc_metrics':          brisc_metrics,
-            'generalization_gap':     gap,
-            'num_samples_evaluated':  len(all_labels),
-            'data_source':            'folder_walk',
+            "pmram_metrics": metrics,
+            "brisc_metrics": brisc_metrics,
+            "generalization_gap": gap,
+            "num_samples_evaluated": len(all_labels),
+            "data_source": "folder_walk",
             # Provenance (C3): exactly which artifact produced these numbers.
-            'checkpoint_path':        os.path.abspath(self.model_path),
-            'checkpoint_sha256':      _sha256_of_file(self.model_path),
-            'preprocessing':          self.preprocessing,  # 'enhanced' = WPT→LMMSE→CLAHE, must match training
+            "checkpoint_path": os.path.abspath(self.model_path),
+            "checkpoint_sha256": _sha256_of_file(self.model_path),
+            "preprocessing": self.preprocessing,  # 'enhanced' = WPT→LMMSE→CLAHE, must match training
         }
 
-        os.makedirs('results', exist_ok=True)
-        out_path = 'results/pmram_external_validation.json'
+        os.makedirs("results", exist_ok=True)
+        out_path = "results/pmram_external_validation.json"
         # Atomic write: never leave a half-written JSON behind on crash.
-        tmp_path = out_path + '.tmp'
-        with open(tmp_path, 'w') as f:
+        tmp_path = out_path + ".tmp"
+        with open(tmp_path, "w") as f:
             json.dump(results, f, indent=4)
         os.replace(tmp_path, out_path)
 
         logger.info(f"Validation completed. Accuracy: {metrics['accuracy']:.4f}")
         logger.info(f"Results saved to {out_path}")
 
-        if self.device.type == 'cuda':
+        if self.device.type == "cuda":
             torch.cuda.empty_cache()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="PMRAM External Validation")
-    parser.add_argument('--model_path',  default='checkpoints/classification/best_efficientnet_exp2_enhanced.pth')
-    parser.add_argument('--pmram_root',  default='data/pmram',
-                        help='Root directory of the PMRAM dataset (folder-walk mode)')
-    parser.add_argument('--pmram_meta',  default='data/pmram/pmram_metadata.csv',
-                        help='CSV metadata fallback path (legacy; folder-walk is authoritative)')
-    parser.add_argument('--brisc_metrics', default='results/metrics_exp2_enhanced_test.json')
-    parser.add_argument('--preprocessing', default='enhanced', choices=['enhanced', 'raw'],
-                        help="Input distribution the model was TRAINED on: 'enhanced' "
-                             "applies WPT→LMMSE→CLAHE (exp2/exp3), 'raw' skips it (exp1).")
+    parser.add_argument(
+        "--model_path", default="checkpoints/classification/best_efficientnet_exp2_enhanced.pth"
+    )
+    parser.add_argument(
+        "--pmram_root",
+        default="data/pmram",
+        help="Root directory of the PMRAM dataset (folder-walk mode)",
+    )
+    parser.add_argument(
+        "--pmram_meta",
+        default="data/pmram/pmram_metadata.csv",
+        help="CSV metadata fallback path (legacy; folder-walk is authoritative)",
+    )
+    parser.add_argument("--brisc_metrics", default="results/metrics_exp2_enhanced_test.json")
+    parser.add_argument(
+        "--preprocessing",
+        default="enhanced",
+        choices=["enhanced", "raw"],
+        help="Input distribution the model was TRAINED on: 'enhanced' "
+        "applies WPT→LMMSE→CLAHE (exp2/exp3), 'raw' skips it (exp1).",
+    )
     args = parser.parse_args()
 
     validator = PMRAMValidator(

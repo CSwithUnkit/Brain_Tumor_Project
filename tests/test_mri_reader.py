@@ -1,4 +1,5 @@
 """Tests for dashboard/mri_reader.py — every MRI format the dashboard accepts."""
+
 import io
 
 import numpy as np
@@ -12,8 +13,7 @@ from dashboard.mri_reader import (
 
 
 def _png_bytes():
-    img = Image.fromarray((np.random.default_rng(0).integers(
-        0, 255, (64, 64))).astype(np.uint8))
+    img = Image.fromarray((np.random.default_rng(0).integers(0, 255, (64, 64))).astype(np.uint8))
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
@@ -22,11 +22,9 @@ def _png_bytes():
 def _dicom_bytes(frames=1, monochrome1=False):
     import pydicom
     from pydicom.dataset import Dataset, FileDataset
-    from pydicom.uid import (ExplicitVRLittleEndian, generate_uid,
-                             MRImageStorage)
+    from pydicom.uid import ExplicitVRLittleEndian, MRImageStorage, generate_uid
 
-    arr = (np.random.default_rng(1).integers(0, 4095, (frames, 48, 48))
-           .astype(np.uint16))
+    arr = np.random.default_rng(1).integers(0, 4095, (frames, 48, 48)).astype(np.uint16)
     file_meta = Dataset()
     file_meta.MediaStorageSOPClassUID = MRImageStorage
     file_meta.MediaStorageSOPInstanceUID = generate_uid()
@@ -51,11 +49,14 @@ def _dicom_bytes(frames=1, monochrome1=False):
 
 
 def _nifti_bytes(shape=(40, 40, 12)):
+    import os
+    import tempfile
+
     import nibabel as nib
-    import tempfile, os
+
     img = nib.Nifti1Image(
-        np.random.default_rng(2).normal(500, 100, shape).astype(np.float32),
-        affine=np.eye(4))
+        np.random.default_rng(2).normal(500, 100, shape).astype(np.float32), affine=np.eye(4)
+    )
     fd, tmp = tempfile.mkstemp(suffix=".nii.gz")
     os.close(fd)
     try:
