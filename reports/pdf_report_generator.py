@@ -521,7 +521,12 @@ def generate_pdf_report(
                 try:
                     pdf.image(imgs[idx], x=x_img, y=y_row + 5, w=iw, h=ih - 5)
                 except Exception:
-                    pass
+                    # Never degrade silently: a missing panel image means the
+                    # exported report no longer shows what the dashboard showed.
+                    print(f"[pdf_report] WARNING: could not embed panel image "
+                          f"'{labels[idx]}' ({imgs[idx]}); leaving its caption "
+                          f"without the image.", file=sys.stderr)
+                    traceback.print_exc(limit=2)
                 pdf.set_xy(x_img, y_row + ih + 1)
                 pdf.set_font("Helvetica", "I", 6)
                 pdf.set_text_color(*_ClinicalPDF.C_FAINT)

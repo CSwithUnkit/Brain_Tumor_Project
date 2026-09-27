@@ -99,13 +99,16 @@ def _read_dicom(data: bytes, filename: str) -> dict:
     arr = ds.pixel_array  # (H, W) or (Frames, H, W)
     arr = _apply_dicom_windowing(ds, arr)
 
+    # Voxel-spacing metadata is informational only (we never convert px→mm);
+    # if the tags are missing/malformed, continue without it rather than
+    # rejecting an otherwise readable scan.
     spacing = None
     try:
         ps = [float(x) for x in ds.PixelSpacing]
         st = float(getattr(ds, "SliceThickness", 0.0))
         spacing = (*ps, st) if st else tuple(ps)
     except Exception:
-        pass
+        pass  # deliberate: spacing is optional metadata, not required
 
     if arr.ndim == 2:
         img = Image.fromarray(_window_normalize(arr))
