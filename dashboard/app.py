@@ -25,7 +25,11 @@ from classification.masking_utils import apply_exp3_guidance_numpy
 from dashboard.mri_reader import load_medical_image, volume_slice_to_pil
 from enhancement.pipeline import EnhancementAblationManager, to_display_rgb
 from explainability.gradcam_generator import BrainTumorGradCAM
-from reports.pdf_report_generator import COUNSELING_DB, generate_clinical_report_bytes
+from reports.pdf_report_generator import (
+    COUNSELING_DB,
+    generate_clinical_report_bytes,
+    personalized_guidance,
+)
 from segmentation.unet_model import UNet
 from utils.device_config import get_system_execution_profile
 
@@ -432,7 +436,7 @@ def _run_pipeline(pil_img: Image.Image, pipeline: str) -> dict:
     }
 
 
-# ── Clinical guidance: 6.1 = this scan's findings, 6.2 = general info ──────────
+# ── Clinical guidance: every 6.x topic splits into .1 personalized / .2 general
 # The split never changes, so the reader can tell at a glance what came from
 # their image vs what is generic category information.
 def render_guidance(pred_class: str, r: dict) -> None:
@@ -440,32 +444,40 @@ def render_guidance(pred_class: str, r: dict) -> None:
     plain_name, _ = PLAIN_INFO[pred_class]
     is_tumor = pred_class != "No Tumor"
     pred_conf = float(r["probs"][r["pred_idx"]] * 100)
-    area, centroid, bbox, perim = r["area"], r["centroid"], r["bbox"], r["perim"]
+    pg = personalized_guidance(
+        pred_class, pred_conf, r["area"], r["perim"], r["centroid"], r["bbox"]
+    )
     with st.expander(f"📋 Clinical guidance — {plain_name}", expanded=is_tumor):
-        st.caption("6.1 is always this scan's own findings; 6.2 is always general information.")
-        st.markdown("**6.1 · About this scan**")
-        st.caption("Findings measured from this scan only.")
-        st.markdown(f"- **AI finding:** {plain_name} ({pred_conf:.1f}% confidence)")
-        if area > 0:
-            st.markdown(f"- **Tumor area:** {area:,} px²")
-            st.markdown(f"- **Tumor perimeter:** {perim:.1f} px")
-            st.markdown(f"- **Location (centroid):** {centroid}")
-            st.markdown(f"- **Bounding box:** {bbox}")
-        else:
-            st.markdown("- **Tumor area:** No focal lesion segmented")
-        st.markdown("**6.2 · General information**")
         st.caption(
-            "General information for this finding category — not personalised medical advice."
+            "Each topic is split in two: .1 is what this scan shows (personalized), "
+            ".2 is general information — not personalised medical advice."
         )
-        st.markdown("**About this finding**")
+
+        st.markdown("**6.1 · About this finding**")
+        st.markdown("*6.1.1 · Personalized — this scan*")
+        st.write(pg["about"])
+        st.markdown("*6.1.2 · General*")
         st.write(info["pathological_nature"])
-        st.markdown("**Precautions & red-flag symptoms**")
+
+        st.markdown("**6.2 · Precautions & red-flag symptoms**")
+        st.markdown("*6.2.1 · Personalized — this scan*")
+        st.write(pg["precautions"])
+        st.markdown("*6.2.2 · General*")
         for p in info["precautions"]:
             st.markdown(f"- {p}")
-        st.markdown("**Recommended workup**")
+
+        st.markdown("**6.3 · Recommended workup**")
+        st.markdown("*6.3.1 · Personalized — this scan*")
+        st.write(pg["workup"])
+        st.markdown("*6.3.2 · General*")
         for s in info["next_steps"]:
             st.markdown(f"- {s}")
-        st.markdown("**Questions for your doctor**")
+
+        st.markdown("**6.4 · Questions for your doctor**")
+        st.markdown("*6.4.1 · Personalized — this scan*")
+        for i, q in enumerate(pg["questions"]):
+            st.checkbox(q, key=f"guidance_pq_{pred_class}_{i}")
+        st.markdown("*6.4.2 · General*")
         for i, item in enumerate(info["checklist"]):
             st.checkbox(item, key=f"guidance_{pred_class}_{i}")
 

@@ -314,6 +314,80 @@ PLAIN_FINDING = {
 }
 
 
+def personalized_guidance(
+    pred_class: str,
+    pred_conf: float,
+    area: int,
+    perim: float,
+    centroid,
+    bbox,
+) -> dict:
+    """Image-specific guidance content for the 6.x.1 subsections.
+
+    Every value below is measured from THIS scan's inference run — never a
+    generic template. The .1 subsections state measured facts and ask
+    questions; they never prescribe treatment or urgency. Only the treating
+    doctor does that.
+
+    Returns {"about": str, "precautions": str, "workup": str,
+             "questions": list[str]} — one entry per 6.x topic.
+    """
+    plain = PLAIN_FINDING.get(pred_class, pred_class)
+    has_lesion = area > 0
+
+    if has_lesion:
+        about = (
+            f"In this scan the model predicted {plain} with {pred_conf:.1f}% confidence. "
+            f"The segmented lesion measures {area:,} px2 (perimeter {perim:.1f} px)"
+            + (f", centred at {centroid}" if centroid else "")
+            + "."
+        )
+        precautions = (
+            f"This scan segmented a focal lesion (area {area:,} px2). Only your doctor "
+            "can judge how urgent this is -- the red-flag symptoms below are the general "
+            "warning signs for this finding category."
+        )
+    else:
+        about = (
+            f"In this scan the model predicted {plain} with {pred_conf:.1f}% confidence, "
+            "and no focal lesion was segmented."
+        )
+        precautions = (
+            "This scan segmented no focal lesion. The red-flag symptoms below are general "
+            "warning signs worth knowing for this finding category."
+        )
+
+    workup = (
+        f"This scan contributes: {plain} at {pred_conf:.1f}% confidence, with the "
+        "measurements shown above. Which confirmatory tests you need is decided by the "
+        "treating doctor -- the list below shows what is commonly considered for this "
+        "finding category."
+    )
+
+    questions = []
+    if has_lesion:
+        questions.append(
+            f"The AI measured a lesion area of {area:,} px2 in my scan -- "
+            "what does this size suggest?"
+        )
+    questions.append(
+        f"The model predicted {plain} with {pred_conf:.1f}% confidence -- "
+        "how certain is this finding?"
+    )
+    if centroid:
+        questions.append(
+            f"The lesion centre was measured at {centroid} -- which brain region is this?"
+        )
+    questions.append("What did the radiologist see differently from the AI, if anything?")
+
+    return {
+        "about": about,
+        "precautions": precautions,
+        "workup": workup,
+        "questions": questions,
+    }
+
+
 def _np_to_pil_tmp(arr: np.ndarray) -> str:
     """Save a numpy uint8 RGB array to a temporary PNG file; return path."""
     img = Image.fromarray(arr.astype(np.uint8))
@@ -403,6 +477,7 @@ def generate_pdf_report(
     report_id = f"NSR-{datetime.now().strftime('%Y%m%d%H%M%S')}"
     counseling = COUNSELING_DB.get(pred_class, COUNSELING_DB["No Tumor"])
     is_tumor = pred_class != "No Tumor"
+    pg = personalized_guidance(pred_class, pred_conf, area, perim, centroid, bbox)
 
     # Save quad images to temp files
     tmp_raw = _np_to_pil_tmp(raw_img)
@@ -579,88 +654,78 @@ def generate_pdf_report(
         pdf.ln(4)
 
         # -- Section 6: Clinical Guidance ----------------------------------
-        # 6.1 is ALWAYS this scan's own findings; 6.2 is ALWAYS general
-        # category information. The split never changes, so the reader can
+        # Every 6.x topic is split the same way: 6.x.1 = this scan's own
+        # measured findings (personalized), 6.x.2 = the fixed category
+        # template (general). The split never changes, so the reader can
         # tell at a glance what came from their image vs what is generic.
         pdf.section_title("6. Clinical Guidance")
-
-        # 6.1 About This Scan — image-specific (from this inference run)
-        pdf.set_font("Helvetica", "B", 8.5)
-        pdf.set_text_color(*_ClinicalPDF.C_TEAL_D)
-        pdf.set_x(10)
-        pdf.cell(0, 6, "6.1  About This Scan", ln=True)
-        pdf.set_font("Helvetica", "I", 7.5)
-        pdf.set_text_color(110, 120, 135)
-        pdf.set_x(10)
-        pdf.cell(0, 5, "Findings measured from this scan only.", ln=True)
-        scan_rows = [
-            (
-                "AI finding",
-                f"{PLAIN_FINDING.get(pred_class, pred_class)} ({pred_conf:.1f}% confidence)",
-            ),
-            (
-                "Tumor area",
-                f"{area:,} px2" if area > 0 else "No focal lesion segmented",
-            ),
-            ("Tumor perimeter", f"{perim:.1f} px" if area > 0 else "N/A"),
-            ("Location (centroid)", str(centroid) if centroid else "N/A"),
-            ("Bounding box", str(bbox) if bbox else "N/A"),
-        ]
-        for i, (k, v) in enumerate(scan_rows):
-            pdf.kv_row(k, v, shade=(i % 2 == 0))
-        pdf.ln(4)
-
-        # 6.2 General Information — fixed template for the finding category
-        pdf.set_font("Helvetica", "B", 8.5)
-        pdf.set_text_color(*_ClinicalPDF.C_TEAL_D)
-        pdf.set_x(10)
-        pdf.cell(0, 6, "6.2  General Information", ln=True)
         pdf.set_font("Helvetica", "I", 7.5)
         pdf.set_text_color(110, 120, 135)
         pdf.set_x(10)
         pdf.multi_cell(
             182,
             4.5,
-            "General information based on the predicted finding category -- "
-            "not personalised medical advice. The treating doctor will tailor "
-            "all decisions to this patient.",
+            "Each topic below is split in two: .1 is what this scan shows "
+            "(personalized), .2 is general information for the finding category "
+            "-- not personalised medical advice.",
             new_x=XPos.LMARGIN,
             new_y=YPos.NEXT,
         )
         pdf.ln(1)
 
-        pdf.set_font("Helvetica", "B", 8)
-        pdf.set_text_color(*_ClinicalPDF.C_TEAL_D)
-        pdf.set_x(10)
-        pdf.cell(0, 6, "About this finding", ln=True)
-        pdf.set_font("Helvetica", "", 8)
-        pdf.set_text_color(*_ClinicalPDF.C_TEXT)
-        pdf.set_x(14)
-        pdf.multi_cell(
-            182, 5.5, counseling["pathological_nature"], new_x=XPos.LMARGIN, new_y=YPos.NEXT
-        )
-        pdf.ln(3)
+        def _topic(num: str, title: str, color: tuple) -> None:
+            pdf.set_font("Helvetica", "B", 8.5)
+            pdf.set_text_color(*color)
+            pdf.set_x(10)
+            pdf.cell(0, 6, f"{num}  {title}", ln=True)
 
-        pdf.set_font("Helvetica", "B", 8)
-        pdf.set_text_color(*_ClinicalPDF.C_AMBER)
-        pdf.set_x(10)
-        pdf.cell(0, 6, "Precautions & red-flag symptoms", ln=True)
+        def _sub(num: str, personalized: bool) -> None:
+            tag = "Personalized -- this scan" if personalized else "General"
+            pdf.set_font("Helvetica", "B", 8)
+            pdf.set_text_color(*_ClinicalPDF.C_TEAL_D if personalized else (110, 120, 135))
+            pdf.set_x(14)
+            pdf.cell(0, 6, f"{num}  {tag}", ln=True)
+
+        def _para(text: str) -> None:
+            pdf.set_font("Helvetica", "", 8)
+            pdf.set_text_color(*_ClinicalPDF.C_TEXT)
+            pdf.set_x(18)
+            pdf.multi_cell(178, 5.5, text, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.ln(2)
+
+        # 6.1 About This Finding
+        _topic("6.1", "About This Finding", _ClinicalPDF.C_TEAL_D)
+        _sub("6.1.1", True)
+        _para(pg["about"])
+        _sub("6.1.2", False)
+        _para(counseling["pathological_nature"])
+        pdf.ln(2)
+
+        # 6.2 Precautions & Red-Flag Symptoms
+        _topic("6.2", "Precautions & Red-Flag Symptoms", _ClinicalPDF.C_AMBER)
+        _sub("6.2.1", True)
+        _para(pg["precautions"])
+        _sub("6.2.2", False)
         for prec in counseling["precautions"]:
             pdf.bullet(prec, color=_ClinicalPDF.C_AMBER)
         pdf.ln(3)
 
-        pdf.set_font("Helvetica", "B", 8)
-        pdf.set_text_color(*_ClinicalPDF.C_TEAL_D)
-        pdf.set_x(10)
-        pdf.cell(0, 6, "Recommended workup", ln=True)
+        # 6.3 Recommended Workup
+        _topic("6.3", "Recommended Workup", _ClinicalPDF.C_TEAL_D)
+        _sub("6.3.1", True)
+        _para(pg["workup"])
+        _sub("6.3.2", False)
         for step in counseling["next_steps"]:
             pdf.bullet(step, color=_ClinicalPDF.C_TEAL_D)
         pdf.ln(3)
 
-        pdf.set_font("Helvetica", "B", 8)
-        pdf.set_text_color(*_ClinicalPDF.C_TEAL_D)
-        pdf.set_x(10)
-        pdf.cell(0, 6, "Questions for your doctor", ln=True)
+        # 6.4 Questions for Your Doctor
+        _topic("6.4", "Questions for Your Doctor", _ClinicalPDF.C_TEAL_D)
+        _sub("6.4.1", True)
+        for i, q in enumerate(pg["questions"], start=1):
+            pdf.checklist_item(q, i)
+        pdf.ln(2)
+        _sub("6.4.2", False)
         for i, item in enumerate(counseling["checklist"], start=1):
             pdf.checklist_item(item, i)
         pdf.ln(4)
@@ -775,6 +840,7 @@ def generate_html_clinical_report(
     report_id = f"NSR-{datetime.now().strftime('%Y%m%d%H%M%S')}"
     counseling = COUNSELING_DB.get(pred_class, COUNSELING_DB["No Tumor"])
     is_tumor = pred_class != "No Tumor"
+    pg = personalized_guidance(pred_class, pred_conf, area, perim, centroid, bbox)
 
     # Encode images as base64
     img_raw = _img_to_base64(raw_img)
@@ -806,20 +872,8 @@ def generate_html_clinical_report(
             ("CNR Enhancement", f"{cnr:+.1f}%"),
         ]
     )
-    # 6.1 rows: this scan's own measured findings (never the generic template).
-    scan_rows = "".join(
-        f"<tr><td>{k}</td><td><strong>{v}</strong></td></tr>"
-        for k, v in [
-            (
-                "AI finding",
-                f"{PLAIN_FINDING.get(pred_class, pred_class)} ({pred_conf:.1f}% confidence)",
-            ),
-            ("Tumor area", f"{area:,} px2" if area > 0 else "No focal lesion segmented"),
-            ("Tumor perimeter", f"{perim:.1f} px" if area > 0 else "N/A"),
-            ("Location (centroid)", str(centroid) if centroid else "N/A"),
-            ("Bounding box", str(bbox) if bbox else "N/A"),
-        ]
-    )
+    # 6.4.1 items: personalized questions generated from this scan's numbers.
+    pquest_items = "".join(f"<li><input type='checkbox'> {q}</li>" for q in pg["questions"])
     prec_items = "".join(f"<li>{p}</li>" for p in counseling["precautions"])
     steps_items = "".join(f"<li>{s}</li>" for s in counseling["next_steps"])
     check_items = "".join(
@@ -925,26 +979,30 @@ def generate_html_clinical_report(
   <tbody>{morph_rows}</tbody></table>
 
   <div class="sh">6. Clinical Guidance</div>
-  <p style="font-size:.72rem;color:#64748b;font-style:italic;margin:.2rem 0 .6rem">6.1 is always this scan's own findings; 6.2 is always general category information.</p>
+  <p style="font-size:.72rem;color:#64748b;font-style:italic;margin:.2rem 0 .6rem">Each topic below is split in two: .1 is what this scan shows (personalized), .2 is general information for the finding category &mdash; not personalised medical advice.</p>
 
-  <p style="font-size:.75rem;font-weight:700;color:#0891b2;margin:.8rem 0 .4rem">6.1 About This Scan</p>
-  <p style="font-size:.72rem;color:#64748b;font-style:italic;margin:0 0 .4rem">Findings measured from this scan only.</p>
-  <table><thead><tr><th>Parameter</th><th>Value</th></tr></thead>
-  <tbody>{scan_rows}</tbody></table>
-
-  <p style="font-size:.75rem;font-weight:700;color:#0891b2;margin:.8rem 0 .4rem">6.2 General Information</p>
-  <p style="font-size:.72rem;color:#64748b;font-style:italic;margin:0 0 .6rem">General information based on the predicted finding category &mdash; not personalised medical advice. The treating doctor will tailor all decisions to this patient.</p>
-
-  <p style="font-size:.75rem;font-weight:700;color:#334155;margin:.8rem 0 .4rem">About this finding</p>
+  <p style="font-size:.78rem;font-weight:700;color:#0891b2;margin:.8rem 0 .4rem">6.1 About This Finding</p>
+  <p style="font-size:.72rem;font-weight:700;color:#0891b2;margin:.5rem 0 .3rem">6.1.1 Personalized &mdash; this scan</p>
+  <p style="font-size:.82rem;color:#334155;margin-bottom:.6rem">{pg["about"]}</p>
+  <p style="font-size:.72rem;font-weight:700;color:#64748b;margin:.5rem 0 .3rem">6.1.2 General</p>
   <p style="font-size:.82rem;color:#334155;margin-bottom:1rem">{counseling["pathological_nature"]}</p>
 
-  <p style="font-size:.75rem;font-weight:700;color:#d97706;margin:.8rem 0 .4rem">Precautions &amp; red-flag symptoms</p>
+  <p style="font-size:.78rem;font-weight:700;color:#d97706;margin:.8rem 0 .4rem">6.2 Precautions &amp; Red-Flag Symptoms</p>
+  <p style="font-size:.72rem;font-weight:700;color:#0891b2;margin:.5rem 0 .3rem">6.2.1 Personalized &mdash; this scan</p>
+  <p style="font-size:.82rem;color:#334155;margin-bottom:.6rem">{pg["precautions"]}</p>
+  <p style="font-size:.72rem;font-weight:700;color:#64748b;margin:.5rem 0 .3rem">6.2.2 General</p>
   <ul>{prec_items}</ul>
 
-  <p style="font-size:.75rem;font-weight:700;color:#7c3aed;margin:.8rem 0 .4rem">Recommended workup</p>
+  <p style="font-size:.78rem;font-weight:700;color:#7c3aed;margin:.8rem 0 .4rem">6.3 Recommended Workup</p>
+  <p style="font-size:.72rem;font-weight:700;color:#0891b2;margin:.5rem 0 .3rem">6.3.1 Personalized &mdash; this scan</p>
+  <p style="font-size:.82rem;color:#334155;margin-bottom:.6rem">{pg["workup"]}</p>
+  <p style="font-size:.72rem;font-weight:700;color:#64748b;margin:.5rem 0 .3rem">6.3.2 General</p>
   <ul>{steps_items}</ul>
 
-  <p style="font-size:.75rem;font-weight:700;color:#059669;margin:.8rem 0 .4rem">Questions for your doctor</p>
+  <p style="font-size:.78rem;font-weight:700;color:#059669;margin:.8rem 0 .4rem">6.4 Questions for Your Doctor</p>
+  <p style="font-size:.72rem;font-weight:700;color:#0891b2;margin:.5rem 0 .3rem">6.4.1 Personalized &mdash; this scan</p>
+  <ul style="list-style:none;padding-left:0">{pquest_items}</ul>
+  <p style="font-size:.72rem;font-weight:700;color:#64748b;margin:.5rem 0 .3rem">6.4.2 General</p>
   <ul style="list-style:none;padding-left:0">{check_items}</ul>
 
   <div class="sh">7. Medical Disclaimer &amp; Regulatory Status</div>
