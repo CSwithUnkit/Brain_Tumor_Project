@@ -1,2 +1,11 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Git LFS: store large model weights outside the git object store.
+# NOTE (2026-09-27): tracking rules only — history was NOT rewritten.
+# The 3 currently-tracked .pth files (~111 MB) still live in plain git
+# history; migrating them needs the user's approval (see report).
+*.pth filter=lfs diff=lfs merge=lfs -text
+*.pt filter=lfs diff=lfs merge=lfs -text
+*.ckpt filter=lfs diff=lfs merge=lfs -text
+*.onnx filter=lfs diff=lfs merge=lfs -text

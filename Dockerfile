@@ -1,9 +1,11 @@
-# Use python:3.11-slim for a minimal, reproducible base image.
+# Use python:3.12-slim for a minimal, reproducible base image.
 # CPU-only PyTorch is installed via the official CPU index URL to keep the
-# image size under ~2 GB (vs ~6 GB for CUDA wheels).  GPU inference is handled
-# via ONNX Runtime or by swapping the base image to pytorch/pytorch:2.3.0-cuda*.
+# image size under ~2 GB (vs ~6 GB for CUDA wheels). GPU users should swap
+# the base image to a CUDA-enabled pytorch image instead.
+# NOTE: the Streamlit dashboard runs PyTorch directly; the old ONNX Runtime
+# inference path was removed from dashboard/app.py (2026-09-27).
 
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # ── System dependencies ────────────────────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \

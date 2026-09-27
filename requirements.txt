@@ -1,43 +1,50 @@
 # Core deep learning
-torch
-torchvision
+# NOTE: for CPU-only installs use the PyTorch CPU index first, e.g.
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+torch>=2.2
+torchvision>=0.17
 
 # Computer vision & image processing
-opencv-python-headless
-scikit-image
-scipy
-PyWavelets
-albumentations
+opencv-python-headless>=4.8
+scikit-image>=0.21
+scipy>=1.11
+PyWavelets>=1.4
+albumentations>=1.3
 
 # Machine learning & metrics
-scikit-learn
+scikit-learn>=1.3
 
-# Explainability
-grad-cam
+# Explainability (imported at module load; no runtime pip installs)
+grad-cam>=1.4
 
 # Data & utilities
-pyyaml
-pandas
-numpy
-matplotlib
-seaborn
-psutil
+pyyaml>=6.0
+pandas>=2.0
+# numpy 2.x breaks older torch builds (ABI); keep the 1.x line until the
+# whole stack is validated against numpy>=2.
+numpy>=1.24,<2
+matplotlib>=3.7
+seaborn>=0.12
+psutil>=5.9
 
 # Training infrastructure
-tensorboard
-tqdm
+tensorboard>=2.14
+tqdm>=4.65
 
 # Dataset access
-kaggle
+kaggle>=1.5
 
 # Web dashboard
-streamlit
-fpdf2
+streamlit>=1.28
+fpdf2>=2.7
 
-# Deployment export (optional — install for ONNX export and ORT inference)
-# onnx
-# onnxruntime          # CPU-only ORT (faster inference without CUDA)
-# onnxruntime-gpu      # GPU ORT (uncomment instead of onnxruntime when using CUDA)
+# Deployment export (optional — uncomment to export/serve ONNX)
+# NOTE: the Streamlit dashboard no longer uses ONNX Runtime at inference
+# time (dead ORT code path removed 2026-09-27; it always runs PyTorch).
+# These packages are only needed for deployment/export_onnx.py.
+# onnx>=1.14
+# onnxruntime>=1.16          # CPU-only ORT
+# onnxruntime-gpu>=1.16      # GPU ORT (uncomment instead of onnxruntime when using CUDA)
 
 # Testing
-pytest
+pytest>=7.4

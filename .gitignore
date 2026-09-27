@@ -20,28 +20,25 @@ var/
 .installed.cfg
 *.egg
 
-# Virtual Environment
+# Virtual environments
 venv/
+.venv/
 .env
 
-# PyTorch & Machine Learning
+# PyTorch & ML artifacts
+# NOTE: three small reference checkpoints are intentionally TRACKED (see the
+# ! negations below). Use Git LFS for any new large weights — see .gitattributes.
 *.pt
 *.ckpt
-runs/
-checkpoints/*
-!checkpoints/unet/
-!checkpoints/unet/best_unet_enhanced.pth
-!checkpoints/classification/
-!checkpoints/classification/best_efficientnet_exp2_enhanced.pth
-!checkpoints/classification/best_efficientnet_exp1_baseline.pth
 *.pth
 !checkpoints/unet/best_unet_enhanced.pth
-!checkpoints/classification/best_efficientnet_exp2_enhanced.pth
 !checkpoints/classification/best_efficientnet_exp1_baseline.pth
+!checkpoints/classification/best_efficientnet_exp2_enhanced.pth
+*.onnx
+runs/
 
-# Datasets & Cloud Storage
-datasets/raw/
-datasets/processed/
+# Datasets (canonical data/ layout) & cloud storage
+datasets/
 data/brisc/
 data/pmram/
 data/cached_enhanced/
@@ -57,10 +54,15 @@ ingestion_summary.log
 *.zip
 *.tar.gz
 
-# TensorBoard runs
-runs/
+# Test / coverage artifacts
+.pytest_cache/
+.coverage
+htmlcov/
 
-# IDEs and Editors
+# Jupyter
+.ipynb_checkpoints/
+
+# IDEs and editors
 .vscode/
 .idea/
 *.swp
@@ -76,7 +78,7 @@ ehthumbs.db
 Thumbs.db
 desktop.ini
 
-# Security & Credentials (STRICT DENYLIST)
+# Security & credentials (STRICT DENYLIST)
 kaggle.json
 */kaggle.json
 **/*.key
@@ -86,7 +88,3 @@ kaggle.json
 .env.*
 credentials.json
 client_secret*.json
-*.log
-data/desktop.ini
-datasets/desktop.ini
-desktop.ini

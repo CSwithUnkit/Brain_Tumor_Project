@@ -1,0 +1,50 @@
+# ── Version control & CI ────────────────────────────────────────────────
+.git
+.gitattributes
+.github
+
+# ── Data & artifacts (never baked into the image) ─────────────────────────
+data/
+checkpoints/
+results/
+reports/figures/
+runs/
+logs/
+*.log
+
+# ── Python noise ──────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ── Notebooks & docs ──────────────────────────────────────────────────────
+.ipynb_checkpoints/
+notebooks/
+
+# ── OS / editor noise ─────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Secrets (belt and suspenders) ─────────────────────────────────────────
+kaggle.json
+**/*.key
+**/*.pem
+**/*.token
+.env
+.env.*
+credentials.json
+client_secret*.json

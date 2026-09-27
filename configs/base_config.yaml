@@ -1,4 +1,22 @@
 # configs/base_config.yaml
+#
+# NOTE: no Python module currently loads this file (verified 2026-09-27:
+# grep found zero references to base_config.yaml or any of its keys).
+# It is kept as the single source of truth for project layout and dataset
+# constants. If you add a config loader, read from here — do not invent
+# new path constants in code.
+#
+# Canonical on-disk layout (must match data/download_datasets.py constants
+# BRISC_RAW_DIR / PMRAM_RAW_DIR / CACHED_ENHANCED_DIR and the training
+# scripts):
+#   data/brisc            raw BRISC dataset (ingestion source)
+#   data/pmram            raw PMRAM dataset (external validation source)
+#   data/cached_enhanced  offline enhanced-image cache (structured, see
+#                         data/dataset_preprocessor.cached_enhanced_target)
+#   checkpoints/unet          U-Net segmentation checkpoints
+#   checkpoints/classification  EfficientNet classifier checkpoints
+#   results/              metrics JSONs + summary CSVs
+
 project_name: "MRI Image Enhancing and Tumor Detection"
 seed: 42
 image_target_dimensions: [256, 256]
@@ -7,24 +25,30 @@ paths:
   # Base paths
   colab_drive_mount: "/content/drive/MyDrive/Brain_Tumor_Project"
   local_base: "./"
-  
-  # Raw data paths
-  raw_data_dir: "datasets/raw"
-  brisc_dir: "datasets/raw/brisc"
-  pmram_dir: "datasets/raw/pmram"
-  
-  # Processed data paths
-  processed_data_dir: "datasets/processed"
-  train_split: "datasets/processed/train"
-  val_split: "datasets/processed/val"
-  test_split: "datasets/processed/test"
-  
+
+  # Raw data paths (canonical data/ layout)
+  raw_data_dir: "data"
+  brisc_dir: "data/brisc"
+  pmram_dir: "data/pmram"
+
+  # Offline enhancement cache
+  cached_enhanced_dir: "data/cached_enhanced"
+
+  # DEPRECATED (2026-09-27): datasets/processed/{train,val,test} were never
+  # written or read — train/val/test splits are produced in-memory by
+  # data/dataset_preprocessor.split_dataset (stratified 70/15/15).
+  # processed_data_dir: "datasets/processed"
+  # train_split: "datasets/processed/train"
+  # val_split: "datasets/processed/val"
+  # test_split: "datasets/processed/test"
+
   # Checkpoint save paths
   checkpoints_dir: "checkpoints"
   unet_checkpoints: "checkpoints/unet"
-  efficientnet_checkpoints: "checkpoints/efficientnetb2"
+  efficientnet_checkpoints: "checkpoints/classification"
 
-  # Logging and outputs
+  # Metrics and logs
+  results_dir: "results"
   logs_dir: "logs"
 
 dataset:
