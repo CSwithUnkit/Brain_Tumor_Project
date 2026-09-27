@@ -3,7 +3,7 @@ import torch
 import numpy as np
 
 from classification.classifier_model import BrainTumorClassifier
-from classification.masking_utils import apply_hard_mask, apply_soft_mask
+from classification.masking_utils import apply_soft_context_mask, apply_soft_mask
 from explainability.gradcam_generator import BrainTumorGradCAM
 from explainability.localization_eval import compute_localization_metrics, binarize_heatmap
 
@@ -24,16 +24,16 @@ def test_hard_masking_behavior():
     # Batch 1: normal mask (center square)
     mask1 = torch.zeros(1, 1, 64, 64)
     mask1[:, :, 20:40, 20:40] = 1.0
-    
+
     # Batch 2: empty mask
     mask2 = torch.zeros(1, 1, 64, 64)
-    
+
     mask_prob = torch.cat([mask1, mask2], dim=0)
-    
-    masked = apply_hard_mask(image, mask_prob, padding=0.1)
-    
+
+    masked = apply_soft_context_mask(image, mask_prob)
+
     assert masked.shape == (2, 3, 64, 64)
-    
+
     # Soft context-preserving: background gets 0.40 intensity (not zero)
     # Formula: I * (0.40 + 0.60 * M_prob)
     # Where mask=0 → weight=0.40, where mask=1 → weight=1.0
@@ -41,9 +41,23 @@ def test_hard_masking_behavior():
         "Background should be 40% intensity, not zero"
     assert torch.allclose(masked[0, :, 25:35, 25:35], torch.tensor(1.0), atol=1e-4), \
         "Tumor region should be at full (100%) intensity"
-    
-    # Batch 2 should be unmasked (fallback) -> entirely ones
-    assert torch.all(masked[1] == 1.0), "Fallback failed for empty mask"
+
+    # Batch 2 should be unmasked (fallback) -> entirely ones (tolerance,
+    # not float equality)
+    assert torch.allclose(masked[1], torch.ones_like(masked[1]), atol=1e-6), \
+        "Fallback failed for empty mask"
+
+
+def test_deprecated_hard_mask_alias():
+    """apply_hard_mask remains available as a deprecated alias."""
+    import warnings
+    from classification.masking_utils import apply_hard_mask
+    image = torch.ones(1, 3, 16, 16)
+    mask_prob = torch.zeros(1, 1, 16, 16)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        out = apply_hard_mask(image, mask_prob)
+    assert out.shape == image.shape
 
 def test_soft_masking_behavior():
     image = torch.ones(1, 3, 64, 64)
@@ -52,12 +66,14 @@ def test_soft_masking_behavior():
     
     gamma = 0.2
     masked = apply_soft_mask(image, mask_prob, gamma=gamma)
-    
-    # Where mask is 0, value should be gamma (0.2)
-    assert torch.all(masked[:, :, 0:30, 0:30] == gamma)
-    
+
+    # Where mask is 0, value should be gamma (0.2) — tolerance, not == on floats
+    assert torch.allclose(masked[:, :, 0:30, 0:30],
+                          torch.full_like(masked[:, :, 0:30, 0:30], gamma), atol=1e-6)
+
     # Where mask is 1, value should be gamma + (1-gamma)*1 = 1.0
-    assert torch.all(masked[:, :, 35:60, 35:60] == 1.0)
+    assert torch.allclose(masked[:, :, 35:60, 35:60],
+                          torch.ones_like(masked[:, :, 35:60, 35:60]), atol=1e-6)
 
 def test_gradcam_generation():
     """Verify Grad-CAM generates valid heatmap without runtime exceptions."""

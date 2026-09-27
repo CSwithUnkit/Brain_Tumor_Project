@@ -59,10 +59,13 @@ class ReportConsolidator:
     Produces dark-themed matplotlib figures and structured Markdown documents.
     """
 
-    def __init__(self):
-        # Resolve paths relative to this file so main() works regardless of cwd
-        # (e.g. when called from Notebook 3 Cell 8 whose cwd may differ)
-        _ROOT = Path(__file__).resolve().parent.parent
+    def __init__(self, project_root: Optional[str] = None):
+        # Resolve paths relative to the project root. Defaults to this file's
+        # location so main() works regardless of cwd (e.g. Notebook 3 Cell 8),
+        # but tests / callers can inject an isolated directory — previously
+        # the paths were ALWAYS the real repo, so the test suite overwrote
+        # the actual reports/ directory (fixed).
+        _ROOT = Path(project_root).resolve() if project_root else Path(__file__).resolve().parent.parent
         self.results_dir = str(_ROOT / 'results')
         self.reports_dir = str(_ROOT / 'reports')
         self.figures_dir = str(_ROOT / 'reports' / 'figures')
@@ -396,11 +399,12 @@ versus images pre-processed with the WPT→LMMSE→CLAHE enhancement pipeline (E
             fig_gap = self._plot_generalization(brisc_acc, pmram_acc)
 
         ts = datetime.now().strftime('%Y-%m-%d %H:%M UTC')
+        pmram_n = pmram.get('num_samples_evaluated', 'N/A')
 
         all_rows = [
             ['Exp 1 — Baseline (Raw)',          self._pct(m1.get('accuracy')), self._pct(m1.get('macro_f1')), self._pct(m1.get('macro_precision')), self._pct(m1.get('macro_recall')), b1.get('epoch', 'N/A')],
             ['Exp 2 — Enhanced (WPT+LMMSE+CLAHE)', self._pct(m2.get('accuracy')), self._pct(m2.get('macro_f1')), self._pct(m2.get('macro_precision')), self._pct(m2.get('macro_recall')), b2.get('epoch', 'N/A')],
-            ['Exp 3 — Segmentation-Guided',     self._pct(m3.get('accuracy')), self._pct(m3.get('macro_f1')), self._pct(m3.get('macro_precision')), self._pct(m3.get('macro_recall')), b3.get('epoch', 'N/A')],
+            ['Exp 3 — Segmentation-Guided ⚠️ pre-fix', self._pct(m3.get('accuracy')), self._pct(m3.get('macro_f1')), self._pct(m3.get('macro_precision')), self._pct(m3.get('macro_recall')), b3.get('epoch', 'N/A')],
         ]
         headers = ['Experiment', 'Accuracy', 'Macro F1', 'Precision', 'Recall', 'Best Epoch']
 
@@ -429,8 +433,15 @@ versus images pre-processed with the WPT→LMMSE→CLAHE enhancement pipeline (E
 
 This Phase II report consolidates all three SRS-defined classification experiments, quantitative
 Grad-CAM XAI localization analysis, and external generalization validation on the PMRAM dataset.
-The segmentation-guided experiment (Exp 3) leverages U-Net-derived RoI crops as an attention
-mechanism for the EfficientNetB2 classifier.
+The segmentation-guided experiment (Exp 3) applies U-Net-derived soft attention weighting
+(not hard RoI cropping) to guide the EfficientNetB2 classifier.
+
+> **⚠️ Metrics provenance:** all classification numbers below are best-validation-epoch
+> values from training runs that pre-date the 2026-09-27 code fixes and were measured
+> **without a held-out test set**. Exp 3 numbers additionally come from runs where
+> segmentation masking was applied during training but **not** during validation
+> (bug fixed in `classification/run_experiments.py` on 2026-09-27) — they are **not**
+> a valid comparison against Exp 1/Exp 2. Re-run all experiments before citing.
 
 {self._horizontal_rule()}
 
@@ -458,8 +469,8 @@ ground-truth U-Net segmentation masks using pixel-level IoU and Dice metrics.
 
 ## 3. External Generalization — PMRAM Validation
 
-Zero-retraining inference was performed on the PMRAM dataset (1,600 original, non-augmented
-brain MRI scans) to assess cross-dataset generalization.
+Zero-retraining inference was performed on the PMRAM dataset ({pmram_n} usable,
+non-augmented brain MRI scans) to assess cross-dataset generalization.
 
 | Metric | BRISC Internal | PMRAM External | Gap (Δ) |
 |---|---|---|---|
@@ -470,20 +481,30 @@ brain MRI scans) to assess cross-dataset generalization.
 
 {'![Generalization Gap](figures/generalization_gap.png)' if fig_gap else '*PMRAM validation data not yet available.*'}
 
-> **Note:** A generalization gap of < 5% indicates strong cross-domain robustness.
+> **Caveats:** the "BRISC Internal" reference stored alongside the PMRAM results
+> matches Exp 3's best validation epoch, **not** the Exp 1 baseline, and the
+> validation script does not record which checkpoint was evaluated — treat the
+> gap as indicative, not definitive. A gap of < 5% would indicate strong
+> cross-domain robustness *once measured against a matched reference*.
 
 {self._horizontal_rule()}
 
 ## 4. Conclusions
 
-1. **Enhancement Impact:** WPT→LMMSE→CLAHE pre-processing provides measurable improvement
-   in CNR and boundary delineation, reflected in Exp 2 metrics vs Exp 1.
-2. **Segmentation-Guided Attention:** U-Net RoI cropping (Exp 3) further focuses
-   the classifier on pathological tissue, expected to yield highest F1 performance.
-3. **Explainability:** Grad-CAM heatmaps demonstrate spatial alignment with ground-truth
-   annotations, supporting clinical trustworthiness of the model.
-4. **Generalization:** PMRAM validation confirms the framework's cross-dataset robustness
-   with minimal domain-shift penalty.
+1. **Enhancement impact:** WPT→LMMSE→CLAHE pre-processing did **not** improve
+   classification accuracy in these runs — Exp 2 (enhanced) scored below the
+   raw-image baseline Exp 1. Enhancement improved CNR/boundary delineation for
+   segmentation; its classification value is unproven.
+2. **Segmentation-guided attention (Exp 3):** reported numbers are **invalid** —
+   they come from pre-fix runs where masking was applied in training but not in
+   validation. No conclusion can be drawn until Exp 3 is re-run with the fixed
+   pipeline (identical masking in train/val/test).
+3. **Explainability:** quantitative Grad-CAM localization was never run
+   ("data not yet available") — no spatial-alignment claim may be cited.
+4. **Generalization:** PMRAM external validation is encouraging but its
+   provenance is unverified (data source recorded as folder-walk, BRISC
+   reference mismatched). Re-run with recorded checkpoint provenance before
+   citing.
 
 {self._horizontal_rule()}
 

@@ -31,29 +31,25 @@ def test_pmram_validation_metadata_filtering(tmp_path):
     assert len(filtered_df) == 2
     assert all(filtered_df['provenance'] == 'original')
 
-def test_report_consolidation_no_crash(tmp_path):
+def test_report_consolidation_no_crash(tmp_path, monkeypatch):
     """Verify that consolidate_reports runs fully and handles missing files gracefully."""
-    # Switch working directory temporarily
-    original_cwd = os.getcwd()
-    os.chdir(tmp_path)
-    
-    try:
-        os.makedirs('results', exist_ok=True)
-        os.makedirs('reports/figures', exist_ok=True)
-        
-        # Inject mock data
-        with open('results/metrics_exp1_baseline.json', 'w') as f:
-            json.dump([{'val_metrics': {'accuracy': 0.85}}], f)
-            
-        consolidator = ReportConsolidator()
-        consolidator.run()
-        
-        assert os.path.exists('reports/PHASE_I_EVALUATION_REPORT.md')
-        assert os.path.exists('reports/PHASE_II_FINAL_REPORT.md')
-        
-        with open('reports/PHASE_I_EVALUATION_REPORT.md', 'r') as f:
-            content = f.read()
-            assert "85.00%" in content  # _pct() converts 0.85 → "85.00%"
-            
-    finally:
-        os.chdir(original_cwd)
+    # Run inside an isolated directory so the real repo's results/ and
+    # reports/ are never touched (previously this test overwrote them).
+    monkeypatch.chdir(tmp_path)
+
+    os.makedirs('results', exist_ok=True)
+    os.makedirs('reports/figures', exist_ok=True)
+
+    # Inject mock data
+    with open('results/metrics_exp1_baseline.json', 'w') as f:
+        json.dump([{'val_metrics': {'accuracy': 0.85}}], f)
+
+    consolidator = ReportConsolidator(project_root=str(tmp_path))
+    consolidator.run()
+
+    assert os.path.exists('reports/PHASE_I_EVALUATION_REPORT.md')
+    assert os.path.exists('reports/PHASE_II_FINAL_REPORT.md')
+
+    with open('reports/PHASE_I_EVALUATION_REPORT.md', 'r') as f:
+        content = f.read()
+        assert "85.00%" in content  # _pct() converts 0.85 → "85.00%"

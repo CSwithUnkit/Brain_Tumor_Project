@@ -128,6 +128,13 @@ class PMRAMValidator:
 
         df = pd.read_csv(self.pmram_meta_path)
 
+        if 'provenance' not in df.columns:
+            raise ValueError(
+                f"PMRAM metadata {self.pmram_meta_path} has no 'provenance' "
+                f"column (found: {list(df.columns)}). Cannot separate original "
+                "from augmented images."
+            )
+
         original_df    = df[df['provenance'] == 'original'].copy()
         augmented_count = len(df) - len(original_df)
 
@@ -199,30 +206,43 @@ class PMRAMValidator:
     def load_brisc_metrics(self) -> Dict[str, float]:
         """
         Load BRISC validation metrics for generalization-gap calculation.
-        Primary  : results/metrics_exp3_seg_guided.json
-        Fallback : results/metrics_exp1_baseline.json
-        Then     : self.brisc_metrics_path
+
+        Priority: the EXPLICIT brisc_metrics_path argument first, then
+        known fallbacks. Within a history file, the BEST epoch (by macro F1,
+        then accuracy) is used — not the last epoch (previously the gap was
+        computed against whatever the final epoch happened to be).
         """
         candidates = [
+            self.brisc_metrics_path,
             'results/metrics_exp3_seg_guided.json',
             'results/metrics_exp1_baseline.json',
-            self.brisc_metrics_path,
         ]
 
         for path in candidates:
-            if not os.path.exists(path):
+            if not path or not os.path.exists(path):
                 continue
             try:
                 with open(path, 'r') as f:
                     history = json.load(f)
                 if not history:
                     continue
-                # History is a list of epoch dicts; return the last epoch's val_metrics
-                metrics = history[-1].get('val_metrics', {})
+                # History may be a list of per-epoch dicts (pick best) or a
+                # single final-metrics dict (e.g. *_test.json).
+                if isinstance(history, list):
+                    def _score(h: dict) -> tuple:
+                        m = h.get('val_metrics', {}) or {}
+                        return (m.get('macro_f1', 0.0), m.get('accuracy', 0.0))
+                    best = max(history, key=_score)
+                    metrics = best.get('val_metrics', {})
+                elif isinstance(history, dict):
+                    metrics = {k: v for k, v in history.items()
+                               if isinstance(v, (int, float))}
+                else:
+                    continue
                 if metrics:
                     logger.info(f"Loaded BRISC metrics from {path}")
                     return metrics
-            except (json.JSONDecodeError, KeyError, IndexError) as e:
+            except (json.JSONDecodeError, KeyError, IndexError, ValueError) as e:
                 logger.warning(f"Could not parse {path}: {e}")
                 continue
 
@@ -268,15 +288,18 @@ class PMRAMValidator:
 
         else:
             # ── Legacy CSV / unit-test path ────────────────────────────
-            logger.info("Falling back to CSV-metadata mode (no real images loaded).")
-            df = self.load_pmram_metadata()
-            logger.info(f"CSV mode: {len(df)} records. No real images — using dummy predictions.")
-
-            # Produce zero-information predictions (all class 0) so the pipeline
-            # runs end-to-end; accuracy will be meaningless but the JSON is produced.
-            n = len(df)
-            all_labels = [0] * n
-            all_preds  = [0] * n
+            # There are no real images behind a bare CSV, so there is NOTHING
+            # honest to evaluate. Previously this branch fabricated
+            # all-zero dummy predictions and wrote them to
+            # results/pmram_external_validation.json as if they were real
+            # external-validation metrics — a research-integrity violation.
+            # Fail loudly instead of publishing fake numbers.
+            raise RuntimeError(
+                "PMRAM folder-walk found no usable images and CSV mode has no "
+                "image data to score. Refusing to write fabricated metrics to "
+                "results/pmram_external_validation.json. Provide --pmram_root "
+                "pointing at the real PMRAM image tree."
+            )
 
         metrics = compute_metrics(np.array(all_labels), np.array(all_preds))
 
@@ -291,7 +314,7 @@ class PMRAMValidator:
             'brisc_metrics':          brisc_metrics,
             'generalization_gap':     gap,
             'num_samples_evaluated':  len(all_labels),
-            'data_source':            'folder_walk' if use_folder_mode else 'csv_metadata',
+            'data_source':            'folder_walk',
         }
 
         os.makedirs('results', exist_ok=True)

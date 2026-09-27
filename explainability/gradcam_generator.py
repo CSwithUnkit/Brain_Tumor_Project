@@ -7,12 +7,15 @@ try:
     from pytorch_grad_cam import GradCAM
     from pytorch_grad_cam.utils.image import show_cam_on_image
     from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
-except ImportError:
-    import subprocess, sys
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "grad-cam", "--quiet"])
-    from pytorch_grad_cam import GradCAM
-    from pytorch_grad_cam.utils.image import show_cam_on_image
-    from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
+except ImportError as e:
+    # Never pip-install at import time (mutates the user's environment as a
+    # side effect of an import). Declare grad-cam in requirements.txt and
+    # fail with an actionable message instead.
+    raise ImportError(
+        "BrainTumorGradCAM requires the 'grad-cam' package, which is not "
+        "installed. Install it with: pip install -r requirements.txt "
+        f"(original import error: {e})"
+    ) from e
 
 logger = logging.getLogger(__name__)
 
