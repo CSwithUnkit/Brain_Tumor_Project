@@ -44,19 +44,19 @@ COUNSELING_DB: dict = {
             "Infiltrative intra-axial neuroepithelial malignancy involving cerebral white matter. "
             "Gliomas arise from glial progenitor cells and demonstrate varying degrees of invasion "
             "along white matter tracts. WHO grading (I-IV) is determined by histology and molecular "
-            "markers. High-grade variants (GBM, WHO Grade IV) carry median survival of 14-16 months "
-            "with standard Stupp protocol chemoradiation."
+            "markers. High-grade variants require prompt neuro-oncology referral; prognosis is "
+            "determined by histology and molecular markers, which the treating team will explain."
         ),
         "precautions": [
             "Seizure precautions: avoid driving, operating heavy machinery, or unsupervised swimming; "
-            "keep emergency anticonvulsant (e.g., lorazepam) readily accessible.",
+            "ask the neurologist whether an emergency seizure-medication plan is needed.",
             "Monitor for raised intracranial pressure (ICP) symptoms: early-morning headache that "
             "worsens on Valsalva, projectile vomiting, papilledema, or progressive focal neurological deficit.",
             "Avoid significant head trauma; use helmet during activities with fall risk.",
             "Report any sudden change in speech, motor function, or seizure pattern immediately to "
             "emergency services or treating neurosurgeon.",
-            "Corticosteroids (dexamethasone) may be prescribed for cerebral oedema -- monitor blood "
-            "glucose and blood pressure; do not abruptly discontinue.",
+            "If corticosteroids are prescribed for brain swelling, take them exactly as directed "
+            "and do not stop suddenly -- discuss monitoring with the treating doctor.",
         ],
         "next_steps": [
             "MR Spectroscopy: Evaluate Choline/NAA ratio (elevated Cho:NAA > 2 supports high-grade glioma).",
@@ -71,7 +71,7 @@ COUNSELING_DB: dict = {
         "checklist": [
             "Discussed diagnosis and WHO grade uncertainty pending tissue biopsy with patient/family.",
             "Seizure precautions counselled; anticonvulsant prescription issued if indicated.",
-            "Corticosteroid therapy initiated for symptomatic cerebral oedema (if applicable).",
+            "Corticosteroid use for symptomatic swelling discussed with the team (if applicable).",
             "Neurosurgery referral placed for stereotactic biopsy/resection.",
             "Molecular testing panel ordered.",
             "Multidisciplinary tumour board (MDT) referral submitted.",
@@ -82,7 +82,7 @@ COUNSELING_DB: dict = {
     "Extra-axial Dural Lesion": {
         "pathological_nature": (
             "Extra-axial, dural-based lesion arising from arachnoid cap cells, most commonly benign "
-            "(WHO Grade I). Meningiomas represent ~37% of primary CNS tumours. WHO Grade II (atypical) "
+            "(WHO Grade I). Meningiomas are among the most common primary CNS tumours. WHO Grade II (atypical) "
             "and Grade III (anaplastic) variants have higher recurrence rates. They may cause symptoms "
             "via mass effect on adjacent brain, cranial nerves, or dural venous sinuses. The characteristic "
             "MRI appearance is a homogeneously enhancing extra-axial mass with a 'dural tail' sign."
@@ -134,12 +134,12 @@ COUNSELING_DB: dict = {
             "indicates chiasmal compression -- this is a surgical urgency.",
             "Watch for adrenal crisis symptoms: severe fatigue, dizziness, hypotension, nausea, "
             "hypoglycemia -- especially post-surgical or with concurrent illness (sick-day rules).",
-            "Avoid medications that may elevate prolactin (antipsychotics, metoclopramide, domperidone) "
-            "in prolactinoma patients unless medically essential.",
+            "Tell the doctor about all medicines being taken -- some can affect prolactin levels; "
+            "do not stop any prescribed medicine on your own.",
             "Pituitary apoplexy risk: sudden severe headache, acute visual loss, or altered consciousness "
             "requires immediate emergency assessment -- may represent haemorrhage into the adenoma.",
-            "Hormonal replacement (hydrocortisone, levothyroxine, testosterone/oestrogen) must not be "
-            "abruptly discontinued.",
+            "If hormone replacement is prescribed, do not stop it suddenly -- "
+            "ask the endocrinologist first.",
         ],
         "next_steps": [
             "Formal Goldman visual field perimetry (Humphrey 24-2 or 30-2) -- quantify bitemporal defect "
@@ -162,7 +162,7 @@ COUNSELING_DB: dict = {
             "Transsphenoidal surgery consultation placed for macroadenoma with visual compromise.",
             "Hydrocortisone stress dosing protocol explained to patient (sick-day rules).",
             "Patient advised re: pituitary apoplexy warning symptoms.",
-            "Dopamine agonist therapy initiated for prolactinoma if appropriate (Endocrinology-led).",
+            "Medical therapy options for prolactinoma discussed with Endocrinology (if appropriate).",
         ],
     },
     "No Tumor": {
@@ -179,7 +179,7 @@ COUNSELING_DB: dict = {
             "(SAH), progressive headache worsening over weeks, headache with fever/neck stiffness, "
             "or new neurological deficit.",
             "Consider vascular pathology if symptoms suggest: MR Angiography for suspected aneurysm or AVM.",
-            "Psychiatric / psychological evaluation if headache/neurological symptoms are functional in origin.",
+            "Consider sensitive discussion and psychological evaluation if symptoms may have a functional component.",
         ],
         "next_steps": [
             "Clinical follow-up as symptoms dictate -- no urgent neurosurgical intervention required.",
@@ -546,6 +546,15 @@ def generate_pdf_report(
 
         # -- Section 6: Clinical Counseling ---------------------------------
         pdf.section_title("6. Clinical Guidance")
+        pdf.set_font("Helvetica", "I", 7.5)
+        pdf.set_text_color(110, 120, 135)
+        pdf.set_x(10)
+        pdf.multi_cell(182, 4.5,
+                       "General information based on the predicted finding category -- "
+                       "not personalised medical advice. The treating doctor will tailor "
+                       "all decisions to this patient.",
+                       new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.ln(1)
 
         # 6.1 Pathological Impression
         pdf.set_font("Helvetica", "B", 8.5)

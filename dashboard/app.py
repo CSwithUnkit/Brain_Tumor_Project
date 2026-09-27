@@ -25,6 +25,7 @@ from segmentation.unet_model import UNet
 from classification.classifier_model import BrainTumorClassifier
 from explainability.gradcam_generator import BrainTumorGradCAM
 from reports.pdf_report_generator import COUNSELING_DB, generate_clinical_report_bytes
+from dashboard.mri_reader import load_medical_image, volume_slice_to_pil
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -93,8 +94,8 @@ section[data-testid="stSidebar"] .block-container{ padding-top:1.2rem; }
   background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:5px 12px; }
 .dx-plain{ font-size:13.5px; color:var(--muted); margin:10px 0 0; line-height:1.6; max-width:640px; }
 .dx-note{ margin-top:12px; font-size:12px; color:var(--faint); }
-.dx-fusion{ margin-top:10px; font-size:12.5px; color:var(--teal-dk); background:var(--teal-bg);
-  border:1px solid #CBE7EB; border-radius:8px; padding:8px 12px; }
+.dx-fusion{ margin-top:10px; font-size:12.5px; color:#8a5a00; background:#fef6e0;
+  border:1px solid #f0dfae; border-radius:8px; padding:8px 12px; }
 
 /* confidence bars */
 .cf-row{ margin:10px 0; }
@@ -200,8 +201,33 @@ st.sidebar.markdown("## 🧠 NeuroScan AI")
 st.sidebar.caption("AI-assisted MRI brain tumor analysis")
 
 st.sidebar.markdown('<div class="sb-step">1 · Scan</div>', unsafe_allow_html=True)
-upload = st.sidebar.file_uploader("MRI scan image", type=["png", "jpg", "jpeg"],
-                                  help="Upload a brain MRI slice as PNG or JPG.")
+upload = st.sidebar.file_uploader(
+    "MRI scan",
+    type=["png", "jpg", "jpeg", "bmp", "tiff", "tif", "webp", "dcm", "nii", "gz"],
+    help="Image slice (PNG/JPG/BMP/TIFF/WebP) or a full volume: DICOM (.dcm), NIfTI (.nii/.nii.gz).",
+)
+
+# Parse once per file; 3-D volumes get a slice picker. Parse errors are
+# shown here in the sidebar (human-readable, from mri_reader).
+scan = None
+slice_idx = 0
+if upload is not None:
+    file_key = (getattr(upload, "file_id", None), upload.name, upload.size)
+    if st.session_state.get("scan_key") != file_key:
+        try:
+            st.session_state["scan"] = load_medical_image(upload.name, upload.getvalue())
+        except ValueError as e:
+            st.sidebar.error(str(e))
+            st.session_state["scan"] = None
+        st.session_state["scan_key"] = file_key
+    scan = st.session_state.get("scan")
+    if scan is not None and scan["kind"] == "volume":
+        n = int(scan["meta"]["slice_count"])
+        slice_idx = st.sidebar.slider("Slice", 0, n - 1, n // 2,
+                                      help="Pick the axial slice to analyze.")
+        st.sidebar.caption(f"Volume: {scan['meta']['format']} · {n} slices")
+    elif scan is not None:
+        st.sidebar.caption(f"Image: {scan['meta'].get('notes', scan['meta']['format'])}")
 
 st.sidebar.markdown('<div class="sb-step">2 · Patient</div>', unsafe_allow_html=True)
 patient_id = st.sidebar.text_input("Patient ID", placeholder="e.g. PID-1024")
@@ -329,13 +355,13 @@ def _run_pipeline(pil_img: Image.Image, pipeline: str) -> dict:
         pred_idx = int(np.argmax(probs))
         pred_class = CLASSES[pred_idx]
 
-        fusion_override = False
-        if area > 100 and pred_class == 'No Tumor':
-            tumor_probs = probs[:3] / (np.sum(probs[:3]) + 1e-8)
-            probs = np.array([*tumor_probs, 0.0])
-            pred_idx = int(np.argmax(probs))
-            pred_class = CLASSES[pred_idx]
-            fusion_override = True
+        # Model disagreement check (no output is altered): the segmentation
+        # and classification heads were trained independently, so when they
+        # disagree the only honest action is to ask for human review.
+        model_disagreement = (
+            (area > 100 and pred_class == 'No Tumor') or
+            (area <= 100 and pred_class != 'No Tumor' and float(probs[pred_idx]) >= 0.80)
+        )
 
         status.update(label="Explaining…")
         st.write("🎯 Generating visual explanation")
@@ -354,7 +380,7 @@ def _run_pipeline(pil_img: Image.Image, pipeline: str) -> dict:
         "raw_rgb": raw_rgb, "enh_rgb": enh_rgb,
         "overlay_seg": overlay_seg, "gradcam_overlay": gradcam_overlay,
         "probs": probs, "pred_idx": pred_idx, "pred_class": pred_class,
-        "fusion_override": fusion_override,
+        "model_disagreement": model_disagreement,
         "area": area, "centroid": centroid, "bbox": bbox,
         "cnr": cnr, "perim": perim,
     }
@@ -365,6 +391,7 @@ def render_guidance(pred_class: str) -> None:
     plain_name, _ = PLAIN_INFO[pred_class]
     is_tumor = pred_class != 'No Tumor'
     with st.expander(f"📋 Clinical guidance — {plain_name}", expanded=is_tumor):
+        st.caption("General information for this finding category — not personalised medical advice.")
         st.markdown("**1 · About this finding**")
         st.write(info['pathological_nature'])
         st.markdown("**2 · Precautions & red-flag symptoms**")
@@ -388,7 +415,7 @@ if upload is None:
       region, classify the finding and explain its reasoning — in under a minute.</p>
       <div class="steps">
         <div class="step anim d1"><div class="n">1</div><div class="t">Upload</div>
-          <div class="d">Add the MRI slice from the sidebar (PNG / JPG).</div></div>
+          <div class="d">Add the MRI from the sidebar — image, DICOM or NIfTI.</div></div>
         <div class="step anim d2"><div class="n">2</div><div class="t">AI analysis</div>
           <div class="d">Enhancement → segmentation → classification → explanation.</div></div>
         <div class="step anim d3"><div class="n">3</div><div class="t">Review</div>
@@ -410,11 +437,16 @@ else:
                    "(notebooks 2 & 3) to enable analysis.", icon="⚠️")
         st.stop()
 
+    if scan is None:
+        st.stop()  # unreadable file: the reason is already shown in the sidebar.
     # Cache inference in session state: ticking checkboxes / switching tabs
     # must not recompute the neural pipeline.
-    inf_key = (getattr(upload, "file_id", None), upload.size, model_choice)
+    inf_key = (getattr(upload, "file_id", None), upload.size, model_choice, slice_idx)
     if st.session_state.get("inf_key") != inf_key:
-        pil_img = Image.open(upload).convert("L")
+        if scan["kind"] == "volume":
+            pil_img = volume_slice_to_pil(scan["volume"], slice_idx)
+        else:
+            pil_img = scan["image"]
         st.session_state["inf_result"] = _run_pipeline(pil_img, model_choice)
         st.session_state["inf_key"] = inf_key
     r = st.session_state["inf_result"]
@@ -427,9 +459,9 @@ else:
     # ── Diagnosis card ──
     dx_cls = "dx-found" if is_tumor else "dx-ok"
     fusion_html = (
-        '<div class="dx-fusion">🔀 U-Net detected a lesion the classifier missed — '
-        'finding adjusted by multi-modal fusion.</div>'
-    ) if r["fusion_override"] else ""
+        '<div class="dx-fusion">⚠️ The segmentation and classification models disagree '
+        'on this scan — please review manually before any decision.</div>'
+    ) if r["model_disagreement"] else ""
     st.markdown(f"""
     <div class="dx {dx_cls} anim">
       <div class="dx-kicker">AI finding · requires radiologist review</div>

@@ -37,6 +37,8 @@ kaggle>=1.5
 # Web dashboard
 streamlit>=1.28
 fpdf2>=2.7
+pydicom>=2.4
+nibabel>=5.0
 
 # Deployment export (optional — uncomment to export/serve ONNX)
 # NOTE: the Streamlit dashboard no longer uses ONNX Runtime at inference
