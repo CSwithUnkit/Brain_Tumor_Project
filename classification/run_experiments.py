@@ -18,12 +18,44 @@ from sklearn.metrics import accuracy_score, precision_recall_fscore_support, con
 
 from torch.utils.data import DataLoader
 from classification.classifier_model import BrainTumorClassifier
-from classification.masking_utils import apply_hard_mask
-from data.dataset_preprocessor import BRISCClassificationDataset
+from classification.masking_utils import apply_soft_context_mask, apply_soft_mask
+from data.dataset_preprocessor import (
+    BRISCClassificationDataset, split_dataset, find_cached_enhanced
+)
 from utils.device_config import get_system_execution_profile, atomic_torch_save, atomic_json_save
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 logger = logging.getLogger(__name__)
+
+def apply_exp3_guidance(images: torch.Tensor, unet_model: torch.nn.Module,
+                        soft: bool = False) -> torch.Tensor:
+    """
+    Apply segmentation-guided masking to a batch.
+
+    CRITICAL: must be applied IDENTICALLY in train, val and test — otherwise
+    the validation metrics (and best-checkpoint selection) are measured on a
+    different distribution than training. Previously masking ran only in the
+    training loop, silently invalidating all Exp3 val metrics.
+
+    Args:
+        images: (B, C, H, W) batch, already on the target device.
+        unet_model: trained U-Net in eval mode.
+        soft: if True use soft attention weighting, else context-preserving
+              hard guidance (see masking_utils).
+    """
+    with torch.no_grad():
+        mask_prob = torch.sigmoid(unet_model(images))  # (B, 1, H, W)
+
+    # Guard: skip masking for samples with near-empty masks (< 50 pixels);
+    # apply_*_mask falls back to the original image for those samples.
+    binary_mask = (mask_prob > 0.5).float()
+    mask_areas = binary_mask.view(binary_mask.size(0), -1).sum(dim=1)  # (B,)
+    valid_mask = (mask_areas >= 50).float().view(-1, 1, 1, 1)
+    safe_mask_prob = mask_prob * valid_mask
+
+    if soft:
+        return apply_soft_mask(images, safe_mask_prob)
+    return apply_soft_context_mask(images, safe_mask_prob)
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -108,26 +140,26 @@ def main():
     scaler = torch.amp.GradScaler('cuda', enabled=use_amp)
     
     # Load real BRISC classification data from metadata
-    import json
     meta_path = 'data/brisc/brisc_metadata.json'
     if not os.path.exists(meta_path):
         raise FileNotFoundError(f"BRISC metadata not found at {meta_path}. Please run: python -m data.dataset_ingestion")
-    
+
     with open(meta_path, 'r') as f:
         brisc_meta = json.load(f)
-    
+
     all_records = brisc_meta.get('classification', [])
     if len(all_records) == 0:
         raise FileNotFoundError("0 classification images found. Please re-run python -m data.dataset_ingestion")
-    
+
     # If Exp 2 or Exp 3, prefer enhanced cached images.
-    # Match by basename; warn (but keep original path) if cache entry is missing.
-    if args.experiment in ['exp2_enhanced', 'exp3_seg_guided']:
+    # Resolved via find_cached_enhanced: structured layout first, legacy flat
+    # basename fallback. Warn (but keep original path) if cache entry is missing.
+    if args.experiment in ['exp2_enhanced', 'exp3_seg_guided', 'exp3_soft_masked']:
         cache_dir = 'data/cached_enhanced'
         missing_cache = 0
         for rec in all_records:
-            cached = os.path.join(cache_dir, os.path.basename(rec['path']))
-            if os.path.exists(cached):
+            cached = find_cached_enhanced(rec['path'], cache_dir)
+            if cached:
                 rec['path'] = cached
             else:
                 missing_cache += 1
@@ -136,16 +168,20 @@ def main():
                 f"⚠️ [WARN] {missing_cache} image(s) not found in {cache_dir}; "
                 "falling back to raw image paths for those entries."
             )
-    
-    random.shuffle(all_records)
+
+    # Stratified 70/15/15 train/val/test split (reuses the shared helper so
+    # every training script splits identically). The test set is NEVER used
+    # for training or model selection — only for the final report.
+    # NOTE: splits are image-level; if the dataset contains multiple slices
+    # per patient, prefer a patient-grouped split to avoid leakage.
     class_to_idx = {'glioma': 0, 'meningioma': 1, 'pituitary': 2, 'no_tumor': 3}
-    split_idx_train = int(len(all_records) * 0.70)
-    split_idx_val   = int(len(all_records) * 0.85)
-    train_records = all_records[:split_idx_train]
-    val_records   = all_records[split_idx_train:split_idx_val]
-    
+    train_records, val_records, test_records = split_dataset(
+        all_records, stratify_col='class', random_state=42
+    )
+
     train_dataset = BRISCClassificationDataset(train_records, split='train', class_to_idx=class_to_idx)
     val_dataset   = BRISCClassificationDataset(val_records,   split='val',   class_to_idx=class_to_idx)
+    test_dataset  = BRISCClassificationDataset(test_records,  split='test',  class_to_idx=class_to_idx)
 
     # DataLoader: use hardware-profile-derived values for safe cross-platform operation.
     train_loader = DataLoader(
@@ -158,15 +194,26 @@ def main():
         pin_memory=pin_memory, num_workers=num_workers,
         persistent_workers=persistent_workers
     )
-    
-    logger.info(f"ℹ️ [INFO] Train: {len(train_dataset)} | Val: {len(val_dataset)} samples")
+    test_loader = DataLoader(
+        test_dataset, batch_size=batch_size, shuffle=False,
+        pin_memory=pin_memory, num_workers=num_workers,
+        persistent_workers=persistent_workers
+    )
+
+    logger.info(f"ℹ️ [INFO] Train: {len(train_dataset)} | Val: {len(val_dataset)} | Test: {len(test_dataset)} samples")
     
     best_val_f1 = 0.0
     history = []
 
     # ── Exp 3: load U-Net for on-the-fly segmentation-guided masking ──────────
+    # NOTE (methodology): the U-Net was trained on BRISC images that overlap
+    # this classifier's train/val pools, so its masks carry information from
+    # data the U-Net has already seen. For a leak-free Exp3, train the U-Net
+    # on a disjoint patient cohort. The masking itself is still applied
+    # identically in train/val/test (see apply_exp3_guidance).
+    use_soft_mask = (args.experiment == 'exp3_soft_masked')
     unet_model: Optional[torch.nn.Module] = None
-    if args.experiment == 'exp3_seg_guided':
+    if args.experiment in ('exp3_seg_guided', 'exp3_soft_masked'):
         unet_ckpt = args.unet_checkpoint or 'checkpoints/unet/best_unet_enhanced.pth'
         if os.path.exists(unet_ckpt):
             from segmentation.unet_model import UNet
@@ -175,7 +222,7 @@ def main():
                 torch.load(unet_ckpt, map_location=device, weights_only=True)
             )
             unet_model.eval()
-            logger.info(f"ℹ️ [INFO] Exp3: U-Net loaded from {unet_ckpt}")
+            logger.info(f"ℹ️ [INFO] Exp3: U-Net loaded from {unet_ckpt} (soft_mask={use_soft_mask})")
         else:
             logger.warning(
                 f"⚠️ [WARN] Exp3: U-Net checkpoint not found at {unet_ckpt}. "
@@ -204,22 +251,9 @@ def main():
             images, labels = images.to(device), labels.to(device)
             optimizer.zero_grad(set_to_none=True)
 
-            # ── Exp 3: generate U-Net masks and apply hard-mask RoI crop ──────
+            # ── Exp 3: segmentation-guided masking (identical in train/val/test)
             if unet_model is not None:
-                with torch.no_grad():
-                    mask_logits = unet_model(images)          # (B, 1, H, W)
-                    mask_prob   = torch.sigmoid(mask_logits)  # probabilities
-
-                # Guard: skip masking for samples with empty masks (< 50 pixels)
-                binary_mask = (mask_prob > 0.5).float()
-                mask_areas  = binary_mask.view(binary_mask.size(0), -1).sum(dim=1)  # (B,)
-                valid_mask  = (mask_areas >= 50).float().view(-1, 1, 1, 1)
-
-                # apply_hard_mask handles per-sample fallback internally, but we
-                # additionally zero-out mask_prob where area < 50 so that
-                # apply_hard_mask receives an explicitly empty mask and falls back.
-                safe_mask_prob = mask_prob * valid_mask
-                images = apply_hard_mask(images, safe_mask_prob, padding=0.15)
+                images = apply_exp3_guidance(images, unet_model, soft=use_soft_mask)
 
             # AMP forward pass: use_amp=True on CUDA (fp16), False on CPU
             with torch.amp.autocast(device_type=device.type, dtype=torch.float16, enabled=use_amp):
@@ -260,7 +294,13 @@ def main():
         with torch.no_grad():
             for images, labels in val_loader:
                 images, labels = images.to(device), labels.to(device)
-                
+
+                # Exp 3: same segmentation guidance as training (C4 fix —
+                # previously validation ran on raw images, invalidating
+                # every Exp3 val metric and checkpoint selection).
+                if unet_model is not None:
+                    images = apply_exp3_guidance(images, unet_model, soft=use_soft_mask)
+
                 with torch.amp.autocast(device_type=device.type, dtype=torch.float16, enabled=use_amp):
                     logits = model(images)
                     loss = criterion(logits, labels)
@@ -305,7 +345,35 @@ def main():
 
     # Atomic JSON save: prevents partial-write corruption on synced drives
     atomic_json_save(history, f"results/metrics_{args.experiment}.json")
-        
+
+    # ── Final evaluation on the HELD-OUT test set ─────────────────────────
+    # The test set was never used for training or model selection. Load the
+    # best (val-selected) checkpoint and report honest test metrics.
+    best_ckpt_path = f"checkpoints/classification/best_efficientnet_{args.experiment}.pth"
+    if os.path.exists(best_ckpt_path):
+        model.load_state_dict(torch.load(best_ckpt_path, map_location=device, weights_only=True))
+        logger.info(f"ℹ️ [INFO] Loaded best checkpoint for test evaluation: {best_ckpt_path}")
+    else:
+        logger.warning("⚠️ [WARN] No best checkpoint found; evaluating final-epoch weights on test set.")
+    model.eval()
+    test_preds, test_labels = [], []
+    with torch.no_grad():
+        for images, labels in test_loader:
+            images, labels = images.to(device), labels.to(device)
+            if unet_model is not None:
+                images = apply_exp3_guidance(images, unet_model, soft=use_soft_mask)
+            with torch.amp.autocast(device_type=device.type, dtype=torch.float16, enabled=use_amp):
+                logits = model(images)
+            test_preds.extend(torch.argmax(logits, dim=1).cpu().numpy())
+            test_labels.extend(labels.cpu().numpy())
+    test_metrics = compute_metrics(np.array(test_labels), np.array(test_preds))
+    test_metrics['num_test_samples'] = len(test_dataset)
+    atomic_json_save(test_metrics, f"results/metrics_{args.experiment}_test.json")
+    logger.info(
+        f"✅ [SUCCESS] Held-out TEST — Acc: {test_metrics['accuracy']:.4f} | "
+        f"Macro F1: {test_metrics['macro_f1']:.4f} (n={len(test_dataset)})"
+    )
+
     writer.close()
 
 if __name__ == '__main__':

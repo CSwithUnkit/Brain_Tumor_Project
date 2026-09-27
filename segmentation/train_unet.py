@@ -14,11 +14,12 @@ from datetime import datetime
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import numpy as np
-import torchvision.transforms as T
-from data.dataset_preprocessor import BRISCSegmentationDataset
+from data.dataset_preprocessor import (
+    BRISCSegmentationDataset, split_dataset, find_cached_enhanced
+)
 
 from segmentation.unet_model import UNet
 from segmentation.metrics import (
@@ -108,14 +109,36 @@ def main():
         raise FileNotFoundError("0 segmentation pairs found. Please re-run python -m data.dataset_ingestion")
 
     logger.info(f"ℹ️ [INFO] Loaded {len(seg_pairs)} segmentation pairs for training.")
-    random.shuffle(seg_pairs)
-    split_idx = int(len(seg_pairs) * 0.7)
-    train_pairs = seg_pairs[:split_idx]
-    val_pairs = seg_pairs[split_idx:]
-    
-    # Use BRISCSegmentationDataset with proper Albumentations + ImageNet normalization
+
+    # --input_type enhanced must ACTUALLY train on enhanced cached images
+    # (previously the flag only changed the checkpoint filename — the model
+    # silently trained on raw images while claiming to be "enhanced").
+    if args.input_type == 'enhanced':
+        cache_dir = 'data/cached_enhanced'
+        missing_cache = 0
+        for pair in seg_pairs:
+            cached = find_cached_enhanced(pair['image_path'], cache_dir)
+            if cached:
+                pair['image_path'] = cached
+            else:
+                missing_cache += 1
+        if missing_cache > 0:
+            logger.warning(
+                f"⚠️ [WARN] {missing_cache} image(s) missing from {cache_dir}; "
+                "falling back to raw paths for those entries."
+            )
+
+    # Stratified 70/15/15 train/val/test split (segmentation pairs carry no
+    # class label, so this falls back to an unstratified shuffle split).
+    # Test set is held out for the final report only — never for training
+    # or model selection.
+    # NOTE: image-level split; prefer patient-grouped split if patient IDs exist.
+    train_pairs, val_pairs, test_pairs = split_dataset(seg_pairs, random_state=42)
+
+    # Use BRISCSegmentationDataset with torchvision v2 paired transforms + ImageNet normalization
     train_dataset = BRISCSegmentationDataset(train_pairs, split='train')
     val_dataset   = BRISCSegmentationDataset(val_pairs, split='val')
+    test_dataset  = BRISCSegmentationDataset(test_pairs, split='test')
 
     # DataLoader: use hardware-profile-derived values for safe cross-platform operation.
     train_loader = DataLoader(
@@ -127,6 +150,16 @@ def main():
         val_dataset, batch_size=batch_size, shuffle=False,
         pin_memory=pin_memory, num_workers=num_workers,
         persistent_workers=persistent_workers
+    )
+    test_loader = DataLoader(
+        test_dataset, batch_size=batch_size, shuffle=False,
+        pin_memory=pin_memory, num_workers=num_workers,
+        persistent_workers=persistent_workers
+    )
+
+    logger.info(
+        f"ℹ️ [INFO] Train: {len(train_dataset)} | Val: {len(val_dataset)} | "
+        f"Test: {len(test_dataset)} segmentation pairs"
     )
     
     for epoch in range(1, args.epochs + 1):
@@ -214,19 +247,52 @@ def main():
             logger.info(f"  ✅ [SUCCESS] New best Dice={val_dice:.4f} checkpoint saved (atomic): {ckpt_name}")
         else:
             epochs_no_improve += 1
-            if epochs_no_improve >= patience:
-                logger.info(f"⚠️ [WARN] Early stopping triggered at epoch {epoch}. Best Dice: {best_dice:.4f}")
-                break
-            
-        history.append({'epoch': epoch, 'val_dice': val_dice})
-        
+
+        # Record every epoch BEFORE the early-stopping check so the
+        # stopping epoch itself is not silently dropped from history.
+        history.append({'epoch': epoch, 'val_dice': val_dice,
+                        'val_iou': val_iou, 'val_hd95': val_hd95,
+                        'train_loss': train_loss, 'val_loss': val_loss})
+
+        if epochs_no_improve >= patience:
+            logger.info(f"⚠️ [WARN] Early stopping triggered at epoch {epoch}. Best Dice: {best_dice:.4f}")
+            break
+
         # FR: Memory Cleanup
         if device.type == 'cuda':
             torch.cuda.empty_cache()
 
     # Atomic JSON save: prevents partial-write corruption on synced drives
     atomic_json_save(history, f"checkpoints/unet/unet_training_history_{args.input_type}.json")
-        
+
+    # ── Final evaluation on the HELD-OUT test set ─────────────────────────
+    best_ckpt = f"checkpoints/unet/best_unet_{args.input_type}.pth"
+    if os.path.exists(best_ckpt):
+        model.load_state_dict(torch.load(best_ckpt, map_location=device, weights_only=True))
+        logger.info(f"ℹ️ [INFO] Loaded best checkpoint for test evaluation: {best_ckpt}")
+    model.eval()
+    test_dice, test_iou, test_hd95, n_batches = 0.0, 0.0, 0.0, 0
+    with torch.no_grad():
+        for images, masks in test_loader:
+            images, masks = images.to(device), masks.to(device)
+            logits = model(images)
+            test_dice += compute_dice_coefficient(logits, masks)
+            test_iou += compute_iou_score(logits, masks)
+            test_hd95 += compute_hausdorff_distance(logits, masks)
+            n_batches += 1
+    if n_batches > 0:
+        test_dice /= n_batches
+        test_iou /= n_batches
+        test_hd95 /= n_batches
+    test_metrics = {'test_dice': test_dice, 'test_iou': test_iou,
+                    'test_hd95': test_hd95,
+                    'num_test_samples': len(test_dataset)}
+    atomic_json_save(test_metrics, f"checkpoints/unet/unet_test_metrics_{args.input_type}.json")
+    logger.info(
+        f"✅ [SUCCESS] Held-out TEST — Dice: {test_dice:.4f} | IoU: {test_iou:.4f} | "
+        f"HD95: {test_hd95:.2f}px (n={len(test_dataset)})"
+    )
+
     writer.close()
 
 if __name__ == '__main__':

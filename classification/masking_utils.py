@@ -4,7 +4,7 @@ from typing import Tuple
 
 logger = logging.getLogger(__name__)
 
-def apply_hard_mask(image: torch.Tensor, mask_prob: torch.Tensor, padding: float = 0.15) -> torch.Tensor:
+def apply_soft_context_mask(image: torch.Tensor, mask_prob: torch.Tensor) -> torch.Tensor:
     """
     FR-028 / FR-029: Soft context-preserving segmentation guidance.
     Instead of zeroing out the background (hard mask), softly retains
@@ -17,10 +17,12 @@ def apply_hard_mask(image: torch.Tensor, mask_prob: torch.Tensor, padding: float
     For empty masks (no_tumor / failed segmentation):
         Returns the original image unchanged.
 
+    NOTE: this was previously (mis)named ``apply_hard_mask`` even though it
+    never crops or zeroes anything — the name now says what it does.
+
     Args:
         image: (B, C, H, W)
         mask_prob: (B, 1, H, W) probabilities from U-Net
-        padding: (unused, kept for API compat with callers)
 
     Returns:
         Context-guided image tensor (B, C, H, W)
@@ -43,6 +45,22 @@ def apply_hard_mask(image: torch.Tensor, mask_prob: torch.Tensor, padding: float
         guided_images.append(img_b * weight)
 
     return torch.stack(guided_images)
+
+
+def apply_hard_mask(image: torch.Tensor, mask_prob: torch.Tensor,
+                    padding: float = 0.15) -> torch.Tensor:
+    """
+    Deprecated alias of :func:`apply_soft_context_mask` (kept for backward
+    compatibility). Despite the name it never performed hard masking —
+    ``padding`` is accepted and ignored.
+    """
+    import warnings
+    warnings.warn(
+        "apply_hard_mask is deprecated; use apply_soft_context_mask "
+        "(the function never performed hard masking).",
+        DeprecationWarning, stacklevel=2,
+    )
+    return apply_soft_context_mask(image, mask_prob)
 
 def apply_soft_mask(image: torch.Tensor, mask_prob: torch.Tensor, gamma: float = 0.4) -> torch.Tensor:
     """
