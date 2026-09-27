@@ -20,9 +20,11 @@ from __future__ import annotations
 
 import io
 import os
+import sys
 import tempfile
+import traceback
 from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import List
 
 import numpy as np
 from PIL import Image
@@ -199,21 +201,21 @@ COUNSELING_DB: dict = {
 
 
 class _ClinicalPDF(FPDF if _FPDF_AVAILABLE else object):  # type: ignore[misc]
-    """fpdf2-based A4 clinical report with institutional header/footer on every page."""
+    """fpdf2-based A4 clinical report -- clean, minimal, medical-grade styling."""
 
-    C_DARK   = (9,   13,  22)
+    C_TEAL   = (14,  124, 140)
+    C_TEAL_D = (10,  94,  107)
+    C_DARK   = (23,  35,  59)
     C_SLATE  = (15,  23,  42)
-    C_CYAN   = (6,   182, 212)
-    C_GREEN  = (16,  185, 129)
-    C_RED    = (244, 63,  94)
-    C_AMBER  = (245, 158, 11)
-    C_VIOLET = (99,  102, 241)
+    C_GREEN  = (30,  127, 79)
+    C_RED    = (178, 58,  42)
+    C_AMBER  = (154, 107, 26)
     C_WHITE  = (255, 255, 255)
-    C_LIGHT  = (248, 250, 252)
+    C_LIGHT  = (246, 248, 251)
     C_BORDER = (226, 232, 240)
-    C_MID    = (71,  85,  105)
-    C_TEXT   = (15,  23,  42)
-    C_FAINT  = (148, 163, 184)
+    C_MID    = (90,  107, 132)
+    C_TEXT   = (23,  35,  59)
+    C_FAINT  = (139, 152, 172)
 
     def __init__(self, institution: str = ""):
         super().__init__(orientation="P", unit="mm", format="A4")
@@ -222,53 +224,48 @@ class _ClinicalPDF(FPDF if _FPDF_AVAILABLE else object):  # type: ignore[misc]
         self.add_page()
 
     def header(self):
-        self.set_fill_color(*self.C_DARK)
-        self.rect(0, 0, 210, 26, style="F")
-        self.set_fill_color(*self.C_CYAN)
-        self.rect(0, 26, 210, 0.8, style="F")
-        self.set_xy(10, 5)
-        self.set_font("Helvetica", "B", 11)
-        self.set_text_color(*self.C_WHITE)
-        self.cell(0, 6, "NEUROSCAN CLINICAL ONCOLOGY WORKSTATION", ln=False)
-        self.set_xy(10, 12)
+        # Slim light header: brand + AI-assisted tag, teal rule.
+        self.set_fill_color(*self.C_WHITE)
+        self.rect(0, 0, 210, 22, style="F")
+        self.set_fill_color(*self.C_TEAL)
+        self.rect(0, 22, 210, 0.9, style="F")
+        self.set_xy(10, 6)
+        self.set_font("Helvetica", "B", 12)
+        self.set_text_color(*self.C_DARK)
+        self.cell(60, 7, "NeuroScan AI", ln=False)
+        self.set_font("Helvetica", "B", 7)
+        self.set_text_color(*self.C_TEAL_D)
+        self.cell(40, 7, "AI-ASSISTED", ln=False)
+        self.set_xy(120, 6)
         self.set_font("Helvetica", "", 7.5)
-        self.set_text_color(*self.C_CYAN)
-        self.cell(0, 5,
-            "MRI Image Enhancement and Tumor Detection  --  AI-Assisted Diagnostic Report  |  "
-            + self.institution)
-        self.set_xy(130, 7)
-        self.set_font("Helvetica", "B", 7.5)
-        self.set_text_color(*self.C_WHITE)
-        self.cell(70, 5, "DIAGNOSTIC IMAGING REPORT", align="R")
-        self.set_xy(0, 27)
+        self.set_text_color(*self.C_MID)
+        self.cell(80, 7, "AI-Assisted Assessment Report", align="R", ln=False)
+        self.set_xy(10, 13)
+        self.set_font("Helvetica", "", 7)
+        self.set_text_color(*self.C_FAINT)
+        self.cell(190, 5, self.institution, ln=False)
+        self.set_xy(0, 24)
 
     def footer(self):
-        self.set_y(-13)
-        self.set_fill_color(*self.C_SLATE)
-        self.rect(0, self.get_y(), 210, 13, style="F")
-        self.set_xy(10, self.get_y() + 3)
+        self.set_y(-12)
         self.set_font("Helvetica", "I", 6.5)
         self.set_text_color(*self.C_FAINT)
-        self.cell(0, 4,
-            "AI-assisted decision support only (SaMD). Requires clinical correlation "
-            "by a certified neuro-radiologist. Not for independent diagnostic use.",
-            align="L")
-        self.set_xy(0, self.get_y())
-        self.cell(200, 4, f"Page {self.page_no()}", align="R")
+        self.set_x(10)
+        self.cell(150, 4,
+            "AI-assisted decision support only. Requires review by a qualified radiologist. "
+            "Not for independent diagnostic use.", ln=False)
+        self.cell(40, 4, f"Page {self.page_no()}", align="R", ln=True)
 
     def section_title(self, text: str, color: tuple = None):
-        color = color or self.C_CYAN
-        self.ln(4)
-        self.set_fill_color(*color)
-        self.rect(10, self.get_y(), 190, 0.5, style="F")
-        self.ln(2)
-        self.set_font("Helvetica", "B", 8.5)
-        self.set_text_color(*color)
+        color = color or self.C_TEAL_D
+        self.ln(5)
+        self.set_font("Helvetica", "B", 10)
+        self.set_text_color(*self.C_DARK)
         self.set_x(10)
-        self.cell(0, 6, "  " + text.upper(), ln=True)
-        self.set_fill_color(*self.C_BORDER)
-        self.rect(10, self.get_y(), 190, 0.3, style="F")
-        self.ln(3)
+        self.cell(0, 6, text, ln=True)
+        self.set_fill_color(*color)
+        self.rect(10, self.get_y(), 190, 0.7, style="F")
+        self.ln(4)
 
     def kv_row(self, key: str, value: str, shade: bool = False):
         if shade:
@@ -287,7 +284,7 @@ class _ClinicalPDF(FPDF if _FPDF_AVAILABLE else object):  # type: ignore[misc]
         self.set_x(indent)
         self.set_font("Helvetica", "B", 9)
         self.set_text_color(*color)
-        self.cell(5, 5.5, chr(8226), ln=False)
+        self.cell(5, 5.5, chr(149), ln=False)  # cp1252 bullet; U+2022 crashes core fonts
         self.set_font("Helvetica", "", 8)
         self.set_text_color(*self.C_TEXT)
         self.set_x(indent + 5)
@@ -302,6 +299,15 @@ class _ClinicalPDF(FPDF if _FPDF_AVAILABLE else object):  # type: ignore[misc]
         self.set_text_color(*self.C_TEXT)
         self.multi_cell(176, 5.5, f"{idx}. {text}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         self.ln(0.5)
+
+
+# Plain-language finding names (same vocabulary as the dashboard UI).
+PLAIN_FINDING = {
+    "Intra-axial Glial Neoplasm": "Glioma",
+    "Extra-axial Dural Lesion": "Meningioma",
+    "Sella Turcica Pituitary Adenoma": "Pituitary adenoma",
+    "No Tumor": "No tumor detected",
+}
 
 
 def _np_to_pil_tmp(arr: np.ndarray) -> str:
@@ -344,8 +350,8 @@ def generate_pdf_report(
     pred_class   : Predicted tumour class name (Glioma / Meningioma / Pituitary Adenoma / No Tumor)
     pred_conf    : Model confidence 0-100 float
     probs        : Softmax probability list [Glioma, Meningioma, Pituitary, No Tumor]
-    area         : Tumour area in pixels squared
-    perim        : Tumour perimeter in pixels
+    area         : Tumor area in pixels squared
+    perim        : Tumor perimeter in pixels
     centroid     : (x, y) tuple or None
     cnr          : CNR enhancement ratio percent
     raw_img      : 256x256 RGB uint8 ndarray - original MRI
@@ -406,46 +412,51 @@ def generate_pdf_report(
             ("Report Generated",   ts_full),
             ("Report ID",          report_id),
             ("MRI Sequence",       sequence),
-            ("Modality",           "MRI Brain - 1.5T / 3.0T T1-Contrast Enhanced"),
-            ("Referring Dept",     "Neurology / Neuro-Oncology"),
             ("Institution",        institution),
             ("AI Pipeline",        model_choice),
-            ("Enhancement",        "WPT -> LMMSE -> CLAHE (+CNR)"),
-            ("Segmentation Model", "U-Net (best_unet_enhanced.pth)"),
-            ("Classifier",         "EfficientNetB2 -- BRISC 2025 (4-class)"),
-            ("Explainability",     "Gradient-weighted Class Activation Maps (Grad-CAM)"),
+            ("Enhancement",        "WPT -> LMMSE -> CLAHE"),
+            ("Segmentation Model", "U-Net"),
+            ("Classifier",         "EfficientNetB2 (4-class)"),
+            ("Explainability",     "Grad-CAM visual attribution"),
         ]
         for i, (k, v) in enumerate(details):
             pdf.kv_row(k, v, shade=(i % 2 == 0))
         pdf.ln(2)
 
-        # -- Section 2: Primary Diagnosis ----------------------------------
+        # -- Section 2: AI Finding -----------------------------------------
         diag_color = _ClinicalPDF.C_RED if is_tumor else _ClinicalPDF.C_GREEN
-        pdf.section_title("2. Primary AI Diagnosis", color=diag_color)
-        fill_rgb = (255, 242, 244) if is_tumor else (240, 253, 244)
+        plain_name = PLAIN_FINDING.get(pred_class, pred_class)
+        pdf.section_title("2. AI Finding", color=diag_color)
+        fill_rgb = (251, 238, 233) if is_tumor else (234, 246, 239)
         pdf.set_fill_color(*fill_rgb)
-        pdf.rect(10, pdf.get_y(), 190, 20, style="F")
+        pdf.rect(10, pdf.get_y(), 190, 24, style="F")
         pdf.set_fill_color(*diag_color)
-        pdf.rect(10, pdf.get_y(), 2, 20, style="F")
+        pdf.rect(10, pdf.get_y(), 2.2, 24, style="F")
         y0 = pdf.get_y()
-        pdf.set_xy(15, y0 + 2)
-        pdf.set_font("Helvetica", "B", 16)
+        pdf.set_xy(16, y0 + 2.5)
+        pdf.set_font("Helvetica", "B", 15)
+        pdf.set_text_color(*_ClinicalPDF.C_DARK)
+        pdf.cell(120, 8, plain_name, ln=False)
+        pdf.set_xy(140, y0 + 4)
+        pdf.set_font("Helvetica", "B", 10)
         pdf.set_text_color(*diag_color)
-        pdf.cell(100, 8, pred_class.upper(), ln=False)
-        pdf.set_xy(15, y0 + 12)
-        pdf.set_font("Helvetica", "", 8.5)
+        pdf.cell(60, 7, f"{pred_conf:.1f}% confidence", align="R", ln=False)
+        pdf.set_xy(16, y0 + 12)
+        pdf.set_font("Helvetica", "", 8)
         pdf.set_text_color(*_ClinicalPDF.C_MID)
-        pdf.cell(0, 6,
-            f"Model Confidence: {pred_conf:.1f}%   |   Pipeline: {model_choice}   |   Sequence: {sequence}",
-            ln=True)
-        pdf.ln(3)
+        pdf.cell(0, 5, f"Clinical term: {pred_class}", ln=True)
+        pdf.set_xy(16, y0 + 17)
+        pdf.set_font("Helvetica", "I", 7.5)
+        pdf.set_text_color(*_ClinicalPDF.C_FAINT)
+        pdf.cell(0, 5, "AI-assisted finding -- requires radiologist review; not a diagnosis.", ln=True)
+        pdf.ln(4)
 
         # -- Section 3: Softmax Distribution --------------------------------
-        pdf.section_title("3. Differential Diagnosis -- Softmax Distribution")
+        pdf.section_title("3. Confidence Distribution")
         col_colors = [
             _ClinicalPDF.C_RED,
             _ClinicalPDF.C_AMBER,
-            _ClinicalPDF.C_VIOLET,
+            _ClinicalPDF.C_TEAL_D,
             _ClinicalPDF.C_GREEN,
         ]
         col_w = [62, 38, 90]
@@ -479,22 +490,24 @@ def generate_pdf_report(
         pdf.ln(3)
 
         # -- Section 4: Visual Quad-Panel -----------------------------------
-        pdf.section_title("4. Visual Examination -- Diagnostic Quad-Panel")
+        pdf.section_title("4. Scan Views")
         labels   = [
-            "1. Raw MRI Input",
-            "2. WPT->LMMSE->CLAHE Enhanced",
-            "3. U-Net Lesion Segmentation",
-            "4. Grad-CAM XAI Attribution",
+            "1. Original Scan",
+            "2. Enhanced",
+            "3. Tumor Map",
+            "4. AI Attention",
         ]
         captions = [
             "Original acquisition",
             f"{cnr:+.1f}% CNR gain",
-            "Crimson tumour RoI / contour",
+            "Tumor region / contour",
             "Model attention heatmap",
         ]
         imgs  = [tmp_raw, tmp_enh, tmp_seg, tmp_gcam]
         iw, ih, gap = 43, 43, 4
         for row in range(2):
+            if pdf.get_y() + ih + 14 > pdf.page_break_trigger:
+                pdf.add_page()
             y_row = pdf.get_y()
             for col in range(2):
                 idx   = row * 2 + col
@@ -503,7 +516,7 @@ def generate_pdf_report(
                 pdf.rect(x_img - 0.5, y_row - 0.5, iw + 1, ih + 8.5, style="F")
                 pdf.set_xy(x_img, y_row)
                 pdf.set_font("Helvetica", "B", 6.5)
-                pdf.set_text_color(*_ClinicalPDF.C_CYAN)
+                pdf.set_text_color(*_ClinicalPDF.C_TEAL_D)
                 pdf.cell(iw, 5, labels[idx], align="C", ln=False)
                 try:
                     pdf.image(imgs[idx], x=x_img, y=y_row + 5, w=iw, h=ih - 5)
@@ -519,28 +532,26 @@ def generate_pdf_report(
         pdf.ln(4)
 
         # -- Section 5: Morphometric Biomarkers ----------------------------
-        pdf.section_title("5. Quantitative Morphometric Biomarkers")
-        mm2_est = round(area * 0.25, 1) if area > 0 else 0
+        pdf.section_title("5. Measurements")
         morpho  = [
-            ("Tumour Area",          f"{area:,} px2" if area > 0 else "No focal lesion"),
-            ("Estimated Area (mm2)", f"{mm2_est} mm2" if area > 0 else "N/A"),
-            ("Lesion Perimeter",     f"{perim:.1f} px" if area > 0 else "N/A"),
-            ("Centroid (X, Y)",      str(centroid) if centroid else "N/A"),
-            ("Bounding Box (XYXY)",  str(bbox) if bbox else "N/A"),
-            ("CNR Enhancement",      f"{cnr:+.1f}% (WPT->LMMSE->CLAHE pipeline)"),
+            ("Tumor Area",      f"{area:,} px2" if area > 0 else "No focal lesion"),
+            ("Tumor Perimeter", f"{perim:.1f} px" if area > 0 else "N/A"),
+            ("Centroid (X, Y)", str(centroid) if centroid else "N/A"),
+            ("Bounding Box",    str(bbox) if bbox else "N/A"),
+            ("Contrast Gain",   f"{cnr:+.1f}% CNR (WPT -> LMMSE -> CLAHE)"),
         ]
         for i, (k, v) in enumerate(morpho):
             pdf.kv_row(k, v, shade=(i % 2 == 0))
         pdf.ln(4)
 
         # -- Section 6: Clinical Counseling ---------------------------------
-        pdf.section_title("6. Physician's Clinical Counseling & Next Steps")
+        pdf.section_title("6. Clinical Guidance")
 
         # 6.1 Pathological Impression
         pdf.set_font("Helvetica", "B", 8.5)
-        pdf.set_text_color(*_ClinicalPDF.C_CYAN)
+        pdf.set_text_color(*_ClinicalPDF.C_TEAL_D)
         pdf.set_x(10)
-        pdf.cell(0, 6, "6.1  Pathological Impression & Subtype Rationale", ln=True)
+        pdf.cell(0, 6, "6.1  About This Finding", ln=True)
         pdf.set_font("Helvetica", "", 8)
         pdf.set_text_color(*_ClinicalPDF.C_TEXT)
         pdf.set_x(14)
@@ -552,25 +563,25 @@ def generate_pdf_report(
         pdf.set_font("Helvetica", "B", 8.5)
         pdf.set_text_color(*_ClinicalPDF.C_AMBER)
         pdf.set_x(10)
-        pdf.cell(0, 6, "6.2  Essential Patient Precautions & Red Flag Warning Symptoms", ln=True)
+        pdf.cell(0, 6, "6.2  Precautions & Red-Flag Symptoms", ln=True)
         for prec in counseling["precautions"]:
             pdf.bullet(prec, color=_ClinicalPDF.C_AMBER)
         pdf.ln(3)
 
         # 6.3 Diagnostic Workup
         pdf.set_font("Helvetica", "B", 8.5)
-        pdf.set_text_color(*_ClinicalPDF.C_VIOLET)
+        pdf.set_text_color(*_ClinicalPDF.C_TEAL_D)
         pdf.set_x(10)
-        pdf.cell(0, 6, "6.3  Recommended Confirmatory Diagnostic Workup", ln=True)
+        pdf.cell(0, 6, "6.3  Recommended Workup", ln=True)
         for step in counseling["next_steps"]:
-            pdf.bullet(step, color=_ClinicalPDF.C_VIOLET)
+            pdf.bullet(step, color=_ClinicalPDF.C_TEAL_D)
         pdf.ln(3)
 
         # 6.4 Physician Checklist
         pdf.set_font("Helvetica", "B", 8.5)
-        pdf.set_text_color(*_ClinicalPDF.C_GREEN)
+        pdf.set_text_color(*_ClinicalPDF.C_TEAL_D)
         pdf.set_x(10)
-        pdf.cell(0, 6, "6.4  Attending Physician Consultation Checklist", ln=True)
+        pdf.cell(0, 6, "6.4  Consultation Checklist", ln=True)
         for i, item in enumerate(counseling["checklist"], start=1):
             pdf.checklist_item(item, i)
         pdf.ln(4)
@@ -691,12 +702,11 @@ def generate_html_clinical_report(
         f"</div></td></tr>"
         for cls, p, col in zip(CLASSES, probs, COLORS)
     )
-    mm2_est = round(area * 0.25, 1) if area > 0 else 0
+    # NOTE: no px->mm2 conversion is shown; pixel spacing is not available.
     morph_rows = "".join(
         f"<tr><td>{k}</td><td><strong>{v}</strong></td></tr>"
         for k, v in [
-            ("Tumour Area", f"{area:,} px2" if area > 0 else "No focal lesion"),
-            ("Estimated Area (mm2)", f"{mm2_est} mm2" if area > 0 else "N/A"),
+            ("Tumor Area", f"{area:,} px2" if area > 0 else "No focal lesion"),
             ("Lesion Perimeter", f"{perim:.1f} px" if area > 0 else "N/A"),
             ("Centroid (X, Y)", str(centroid) if centroid else "N/A"),
             ("Bounding Box (XYXY)", str(bbox) if bbox else "N/A"),
@@ -778,7 +788,7 @@ def generate_html_clinical_report(
   <table><tbody>
     <tr><td>Patient ID</td><td><strong>{patient_id}</strong></td><td>Scan Date</td><td><strong>{scan_date}</strong></td></tr>
     <tr><td>Report ID</td><td>{report_id}</td><td>Report Generated</td><td>{ts_full}</td></tr>
-    <tr><td>MRI Sequence</td><td>{sequence}</td><td>Modality</td><td>MRI Brain &mdash; 1.5T/3.0T T1-CE</td></tr>
+    <tr><td>MRI Sequence</td><td>{sequence}</td><td>Modality</td><td>MRI Brain</td></tr>
     <tr><td>Institution</td><td>{institution}</td><td>Referring Dept</td><td>Neurology / Neuro-Oncology</td></tr>
     <tr><td>AI Pipeline</td><td>{model_choice}</td><td>Enhancement</td><td>WPT &rarr; LMMSE &rarr; CLAHE</td></tr>
     <tr><td>Classifier</td><td>EfficientNetB2 (BRISC 2025)</td><td>Explainability</td><td>Grad-CAM (layer4)</td></tr>
@@ -876,8 +886,12 @@ def generate_clinical_report_bytes(
             data = generate_pdf_report(**kwargs)
             if data[:4] == b"%PDF":
                 return data, "application/pdf", "pdf"
-        except Exception:
-            pass
+            raise RuntimeError("PDF generator did not return %PDF bytes")
+        except Exception as e:
+            # Never degrade silently: log loudly, then fall back to HTML.
+            print(f"[reports] PDF generation failed, falling back to HTML: {e!r}",
+                  file=sys.stderr)
+            traceback.print_exc()
     # Fallback to HTML
     html = generate_html_clinical_report(**kwargs)
     return html.encode("utf-8"), "text/html", "html"
