@@ -23,11 +23,11 @@ pinned: false
 1. **Image Enhancement:** Fixed sequence pipeline utilizing Wavelet Packet Transform (WPT) -> Linear Minimum Mean Square Error (LMMSE) -> Contrast Limited Adaptive Histogram Equalization (CLAHE) for maximal noise reduction and contrast recovery.
 2. **Segmentation:** U-Net architecture powered by a compound Tversky Focal Loss and cKDTree Hausdorff Distance (HD95) for robust small-tumor binary segmentation.
 3. **Classification:** EfficientNetB2 with Two-Stage Transfer Learning. Assessed via 3 experiments: 
-   - Exp 1: Baseline 
-   - Exp 2: Enhanced 
-   - Exp 3: Cascaded Segmentation-Guided crop
+   - Exp 1: Baseline (raw images — 98.89% best val accuracy)
+   - Exp 2: Enhanced (98.22% — did not beat the raw baseline in recorded runs)
+   - Exp 3: Segmentation-Guided attention ⚠️ (88.33% — pre-fix numbers; masking ran in training but not validation, fixed 2026-09-27, re-run required)
 4. **Explainability:** Grad-CAM feature attribution on `features[-1]` combined with quantitative IoU spatial localization analysis.
-5. **External Generalization:** Zero-retraining PMRAM validation on 1,600 original scans to measure clinical generalization.
+5. **External Generalization:** Zero-retraining PMRAM validation on 1,505 usable scans (see `results/pmram_external_validation.json`) to measure clinical generalization. BRISC reference stored alongside is Exp 3's best val epoch (88.00%), not the Exp 1 baseline — see `reports/PHASE_II_FINAL_REPORT.md` §3.
 
 ---
 
