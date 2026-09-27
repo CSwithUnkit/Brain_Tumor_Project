@@ -314,6 +314,170 @@ PLAIN_FINDING = {
 }
 
 
+# Doctor-voiced guidance content, keyed by clinical class.
+#
+# AUDIENCE CONTRACT: the clinical report and dashboard guidance are written
+# FOR the treating clinician. COUNSELING_DB (patient voice) is the source for
+# the separate patient handout only -- it must never leak into the clinical
+# surfaces. Each entry: precautions (clinical red-flag / monitoring guidance),
+# workup (clinical, no treatment prescription), counseling (talking points the
+# doctor covers WITH the patient -- never "ask your doctor" phrasing).
+DOCTOR_GUIDANCE: dict = {
+    "Intra-axial Glial Neoplasm": {
+        "precautions": [
+            "Seizure risk: counsel on safety precautions (driving, swimming, "
+            "unsupervised activities); consider whether an emergency "
+            "seizure-action plan is indicated.",
+            "Monitor for raised intracranial pressure: early-morning headache "
+            "worsening on Valsalva, projectile vomiting, papilledema, or "
+            "progressive focal neurological deficit.",
+            "Advise avoidance of significant head trauma; helmet use for "
+            "activities with fall risk.",
+            "Instruct the patient to seek emergency care for any sudden change "
+            "in speech, motor function, or seizure pattern.",
+            "If corticosteroids are used for peritumoral edema, supervise the "
+            "taper -- do not discontinue abruptly.",
+        ],
+        "workup": [
+            "Consider advanced MRI techniques (e.g. MR spectroscopy) to further "
+            "characterize the lesion.",
+            "Thin-slice 3D T1 contrast-enhanced MRI (1 mm isotropic MPRAGE) for surgical planning.",
+            "Neurosurgical referral: stereotactic biopsy versus maximal safe resection.",
+            "Molecular panel on tissue: IDH1/IDH2 mutation status, 1p/19q "
+            "codeletion, MGMT promoter methylation, TERT promoter, EGFR "
+            "amplification.",
+            "Functional MRI (fMRI) and DTI tractography if the lesion is near "
+            "eloquent cortex or the corticospinal tract.",
+            "Multidisciplinary tumour board review (radiation oncology, neuro-oncology).",
+        ],
+        "counseling": [
+            "Explain the finding and why tissue diagnosis (biopsy) is required "
+            "to establish the grade.",
+            "Discuss seizure precautions and whether prophylactic medication is indicated.",
+            "Discuss whether medical management of peritumoral edema is indicated.",
+            "Discuss neurosurgical referral options (biopsy versus resection).",
+            "Explain that molecular testing of the tissue will guide further management.",
+            "Explain that the case will be reviewed by a multidisciplinary tumour board.",
+            "Advise on the follow-up MRI schedule.",
+            "Offer information on available support services (palliative care, counseling).",
+        ],
+    },
+    "Extra-axial Dural Lesion": {
+        "precautions": [
+            "Monitor for cranial nerve compression: sudden visual field changes "
+            "(chiasmal compression), diplopia, facial numbness, or hearing loss "
+            "-- advise emergency presentation if acute.",
+            "Counsel on activity restrictions related to the tumor's location "
+            "(neurosurgical input).",
+            "Instruct the patient to report any new-onset focal motor deficit, "
+            "word-finding difficulty, or sudden severe headache.",
+            "Seizure prophylaxis per clinical judgment.",
+            "If the patient is anticoagulated for other indications, review "
+            "with neurosurgery before any procedural intervention (vascular "
+            "supply from external carotid branches).",
+        ],
+        "workup": [
+            "High-resolution CT with bone windows: assess hyperostosis, "
+            "intratumoral calcification, and skull-base involvement.",
+            "MR angiography or DSA: evaluate vascular supply (middle meningeal "
+            "artery) and proximity to dural venous sinuses -- critical for "
+            "resection planning.",
+            "Formal ophthalmology / neuro-ophthalmology review if near the "
+            "optic nerve, chiasm, or cavernous sinus.",
+            "Neurosurgical consultation for Simpson Grade resection planning "
+            "(Grade I/II associated with lowest recurrence).",
+            "Discuss focused radiation options with the specialist if surgery is unsuitable.",
+            "Advise on follow-up imaging intervals per clinical judgment.",
+        ],
+        "counseling": [
+            "Explain why the exact grade requires tissue diagnosis.",
+            "Confirm whether a cranial nerve examination has been performed.",
+            "Arrange eye specialist review for any visual symptoms.",
+            "Discuss neurosurgical options and whether focused radiation is an alternative.",
+            "Discuss whether CT is needed to assess bone involvement.",
+            "Discuss whether vessel imaging (MR angiography) is needed.",
+            "If surveillance is advised, explain the follow-up scan schedule.",
+            "Ensure the patient knows which symptoms require emergency care.",
+        ],
+    },
+    "Sella Turcica Pituitary Adenoma": {
+        "precautions": [
+            "New visual changes (e.g. loss of side vision) require prompt "
+            "assessment -- urgent ophthalmology / neuro-ophthalmology input.",
+            "Watch for adrenal crisis: severe fatigue, dizziness, hypotension, "
+            "nausea, hypoglycemia -- especially post-surgical or with "
+            "intercurrent illness (sick-day rules).",
+            "Review all current medications -- some affect prolactin levels; "
+            "advise against stopping any prescribed medicine unilaterally.",
+            "Pituitary apoplexy risk: sudden severe headache, acute visual "
+            "loss, or altered consciousness requires immediate emergency "
+            "assessment (possible haemorrhage into the adenoma).",
+            "If hormone replacement is prescribed, supervise it -- abrupt "
+            "cessation is unsafe (endocrinology input).",
+        ],
+        "workup": [
+            "Formal Goldman visual field perimetry (Humphrey 24-2 or 30-2) -- "
+            "quantify bitemporal defect and establish a monitoring baseline.",
+            "Complete anterior pituitary endocrine panel: PRL, ACTH, 8 AM "
+            "cortisol, GH, IGF-1, TSH, free T4, LH, FSH, testosterone/oestradiol.",
+            "Dedicated pituitary MRI protocol: coronal 3 mm T1 pre/post "
+            "gadolinium + dynamic sequence for adenoma versus normal gland "
+            "delineation.",
+            "For hormone-secreting adenomas: endocrinology input on medical therapy options.",
+            "Endoscopic transsphenoidal surgery (ETS) consultation for "
+            "macroadenomas with chiasmal compression or medically refractory "
+            "functional adenomas.",
+            "Post-operative cortisol and pituitary function assessment (Day 1 "
+            "morning cortisol) if surgery is performed.",
+        ],
+        "counseling": [
+            "Arrange urgent visual field testing if indicated.",
+            "Arrange a full pituitary hormone blood panel.",
+            "Consider eye specialist referral.",
+            "Consider endocrinology review.",
+            "Discuss surgical consultation, especially if vision is affected.",
+            "If hydrocortisone is prescribed, explain sick-day rules.",
+            "Ensure the patient knows the emergency warning symptoms (sudden "
+            "severe headache, vision loss).",
+            "For hormone-secreting adenomas, discuss medication options (endocrinology).",
+        ],
+    },
+    "No Tumor": {
+        "precautions": [
+            "No tumor was flagged on this scan, but a negative AI result does "
+            "not exclude all pathology -- confirm with full radiological review.",
+            "Evaluate non-neoplastic causes of the presenting symptoms: tension "
+            "headache, migraine (with aura), cervicogenic headache, or "
+            "age-related microvascular changes.",
+            "Counsel the patient on red-flag headache symptoms warranting "
+            "urgent re-imaging: thunderclap onset, progressive worsening over "
+            "weeks, headache with fever/neck stiffness, or new neurological "
+            "deficit.",
+            "Consider vascular pathology if suggested by symptoms: MR "
+            "angiography for suspected aneurysm or AVM.",
+            "If symptoms persist despite a normal scan, pursue alternative causes.",
+        ],
+        "workup": [
+            "Determine follow-up and urgency of referral on clinical grounds.",
+            "Neurology referral for persistent headache: classification and "
+            "pharmacological management.",
+            "Cervical spine MRI if cervicogenic headache is suspected.",
+            "EEG if seizure-like episodes are reported.",
+            "Ophthalmology review for visual symptoms (migraine equivalent, "
+            "papilledema screening).",
+        ],
+        "counseling": [
+            "Confirm the scan appears normal on independent review.",
+            "Discuss alternative explanations for the patient's symptoms.",
+            "Ensure the patient knows the red-flag symptoms for urgent re-check.",
+            "Discuss neurology referral if symptoms persist.",
+            "Explain the follow-up plan and when to return.",
+            "Ensure the referring clinician receives this result.",
+        ],
+    },
+}
+
+
 def personalized_guidance(
     pred_class: str,
     pred_conf: float,
@@ -321,19 +485,32 @@ def personalized_guidance(
     perim: float,
     centroid,
     bbox,
+    audience: str = "doctor",
 ) -> dict:
     """Image-specific guidance content for the 6.x.1 subsections.
 
     Every value below is measured from THIS scan's inference run — never a
-    generic template. The .1 subsections state measured facts and ask
-    questions; they never prescribe treatment or urgency. Only the treating
-    doctor does that.
+    generic template. The .1 subsections state measured facts; they never
+    prescribe treatment or urgency. Only the treating doctor does that.
+
+    Parameters
+    ----------
+    audience : "doctor" (default) or "patient".
+        "doctor"  -- clinical voice for the dashboard guidance and the
+                     clinical report. The 6.4.1 items are counseling points
+                     (what the doctor covers WITH the patient).
+        "patient" -- plain voice for the separate patient handout. The 6.4.1
+                     items are questions the patient can ask their doctor.
 
     Returns {"about": str, "precautions": str, "workup": str,
-             "questions": list[str]} — one entry per 6.x topic.
+             "questions": list[str]} — one entry per 6.x topic. The
+    "questions" list is the 6.4.1 checklist, voiced for the audience.
     """
+    if audience not in ("doctor", "patient"):
+        raise ValueError(f"audience must be 'doctor' or 'patient', got {audience!r}")
     plain = PLAIN_FINDING.get(pred_class, pred_class)
     has_lesion = area > 0
+    for_doctor = audience == "doctor"
 
     if has_lesion:
         about = (
@@ -342,43 +519,90 @@ def personalized_guidance(
             + (f", centred at {centroid}" if centroid else "")
             + "."
         )
-        precautions = (
-            f"This scan segmented a focal lesion (area {area:,} px2). Only your doctor "
-            "can judge how urgent this is -- the red-flag symptoms below are the general "
-            "warning signs for this finding category."
-        )
+        if for_doctor:
+            precautions = (
+                f"This scan segmented a focal lesion (area {area:,} px2). Urgency is "
+                "a clinical judgment -- the red-flag features below are the general "
+                "warning signs for this finding category; counsel the patient accordingly."
+            )
+        else:
+            precautions = (
+                f"This scan segmented a focal lesion (area {area:,} px2). Only your doctor "
+                "can judge how urgent this is -- the red-flag symptoms below are the general "
+                "warning signs for this finding category."
+            )
     else:
         about = (
             f"In this scan the model predicted {plain} with {pred_conf:.1f}% confidence, "
             "and no focal lesion was segmented."
         )
-        precautions = (
-            "This scan segmented no focal lesion. The red-flag symptoms below are general "
-            "warning signs worth knowing for this finding category."
-        )
+        if for_doctor:
+            precautions = (
+                "This scan segmented no focal lesion. The red-flag features below are "
+                "the general warning signs for this finding category."
+            )
+        else:
+            precautions = (
+                "This scan segmented no focal lesion. The red-flag symptoms below are general "
+                "warning signs worth knowing for this finding category."
+            )
 
-    workup = (
-        f"This scan contributes: {plain} at {pred_conf:.1f}% confidence, with the "
-        "measurements shown above. Which confirmatory tests you need is decided by the "
-        "treating doctor -- the list below shows what is commonly considered for this "
-        "finding category."
-    )
+    if for_doctor:
+        workup = (
+            f"This scan contributes: {plain} at {pred_conf:.1f}% confidence, with the "
+            "measurements shown above. Confirmatory testing is at the treating "
+            "physician's discretion -- the list below reflects what is commonly "
+            "considered for this finding category."
+        )
+    else:
+        workup = (
+            f"This scan contributes: {plain} at {pred_conf:.1f}% confidence, with the "
+            "measurements shown above. Which confirmatory tests you need is decided by the "
+            "treating doctor -- the list below shows what is commonly considered for this "
+            "finding category."
+        )
 
     questions = []
-    if has_lesion:
+    if for_doctor:
+        # 6.4.1 counseling points: what the doctor covers WITH the patient,
+        # grounded in this scan's numbers.
+        if has_lesion:
+            questions.append(
+                f"Lesion area measured at {area:,} px2 -- correlate with the clinical "
+                "presentation and any prior imaging."
+            )
+        else:
+            questions.append(
+                "No focal lesion was segmented -- confirm with full radiological "
+                "review; a negative AI result does not exclude all pathology."
+            )
         questions.append(
-            f"The AI measured a lesion area of {area:,} px2 in my scan -- "
-            "what does this size suggest?"
+            f"Model confidence {pred_conf:.1f}% -- interpret alongside the full clinical "
+            "picture; AI output is assistive only."
         )
-    questions.append(
-        f"The model predicted {plain} with {pred_conf:.1f}% confidence -- "
-        "how certain is this finding?"
-    )
-    if centroid:
+        if centroid:
+            questions.append(
+                f"Lesion centroid at {centroid} -- confirm the anatomical region on "
+                "diagnostic review."
+            )
         questions.append(
-            f"The lesion centre was measured at {centroid} -- which brain region is this?"
+            "Document concordance or discordance with the radiologist's independent read."
         )
-    questions.append("What did the radiologist see differently from the AI, if anything?")
+    else:
+        if has_lesion:
+            questions.append(
+                f"The AI measured a lesion area of {area:,} px2 in my scan -- "
+                "what does this size suggest?"
+            )
+        questions.append(
+            f"The model predicted {plain} with {pred_conf:.1f}% confidence -- "
+            "how certain is this finding?"
+        )
+        if centroid:
+            questions.append(
+                f"The lesion centre was measured at {centroid} -- which brain region is this?"
+            )
+        questions.append("What did the radiologist see differently from the AI, if anything?")
 
     return {
         "about": about,
@@ -476,6 +700,9 @@ def generate_pdf_report(
     ts_full = datetime.now().strftime("%d %B %Y, %H:%M")
     report_id = f"NSR-{datetime.now().strftime('%Y%m%d%H%M%S')}"
     counseling = COUNSELING_DB.get(pred_class, COUNSELING_DB["No Tumor"])
+    # Doctor-voiced guidance for the clinical surfaces. COUNSELING_DB stays
+    # patient-voiced and is used for the patient handout only.
+    doctor = DOCTOR_GUIDANCE.get(pred_class, DOCTOR_GUIDANCE["No Tumor"])
     is_tumor = pred_class != "No Tumor"
     pg = personalized_guidance(pred_class, pred_conf, area, perim, centroid, bbox)
 
@@ -706,7 +933,7 @@ def generate_pdf_report(
         _sub("6.2.1", True)
         _para(pg["precautions"])
         _sub("6.2.2", False)
-        for prec in counseling["precautions"]:
+        for prec in doctor["precautions"]:
             pdf.bullet(prec, color=_ClinicalPDF.C_AMBER)
         pdf.ln(3)
 
@@ -715,18 +942,18 @@ def generate_pdf_report(
         _sub("6.3.1", True)
         _para(pg["workup"])
         _sub("6.3.2", False)
-        for step in counseling["next_steps"]:
+        for step in doctor["workup"]:
             pdf.bullet(step, color=_ClinicalPDF.C_TEAL_D)
         pdf.ln(3)
 
-        # 6.4 Questions for Your Doctor
-        _topic("6.4", "Questions for Your Doctor", _ClinicalPDF.C_TEAL_D)
+        # 6.4 Patient Counseling Points (doctor -> patient talking points)
+        _topic("6.4", "Patient Counseling Points", _ClinicalPDF.C_TEAL_D)
         _sub("6.4.1", True)
         for i, q in enumerate(pg["questions"], start=1):
             pdf.checklist_item(q, i)
         pdf.ln(2)
         _sub("6.4.2", False)
-        for i, item in enumerate(counseling["checklist"], start=1):
+        for i, item in enumerate(doctor["counseling"], start=1):
             pdf.checklist_item(item, i)
         pdf.ln(4)
 
@@ -839,6 +1066,9 @@ def generate_html_clinical_report(
     ts_full = datetime.now().strftime("%d %B %Y, %H:%M")
     report_id = f"NSR-{datetime.now().strftime('%Y%m%d%H%M%S')}"
     counseling = COUNSELING_DB.get(pred_class, COUNSELING_DB["No Tumor"])
+    # Doctor-voiced guidance for the clinical surfaces. COUNSELING_DB stays
+    # patient-voiced and is used for the patient handout only.
+    doctor = DOCTOR_GUIDANCE.get(pred_class, DOCTOR_GUIDANCE["No Tumor"])
     is_tumor = pred_class != "No Tumor"
     pg = personalized_guidance(pred_class, pred_conf, area, perim, centroid, bbox)
 
@@ -874,10 +1104,10 @@ def generate_html_clinical_report(
     )
     # 6.4.1 items: personalized questions generated from this scan's numbers.
     pquest_items = "".join(f"<li><input type='checkbox'> {q}</li>" for q in pg["questions"])
-    prec_items = "".join(f"<li>{p}</li>" for p in counseling["precautions"])
-    steps_items = "".join(f"<li>{s}</li>" for s in counseling["next_steps"])
+    prec_items = "".join(f"<li>{p}</li>" for p in doctor["precautions"])
+    steps_items = "".join(f"<li>{s}</li>" for s in doctor["workup"])
     check_items = "".join(
-        f"<li><input type='checkbox'> {item}</li>" for item in counseling["checklist"]
+        f"<li><input type='checkbox'> {item}</li>" for item in doctor["counseling"]
     )
 
     return f"""<!DOCTYPE html>
@@ -999,7 +1229,7 @@ def generate_html_clinical_report(
   <p style="font-size:.72rem;font-weight:700;color:#64748b;margin:.5rem 0 .3rem">6.3.2 General</p>
   <ul>{steps_items}</ul>
 
-  <p style="font-size:.78rem;font-weight:700;color:#059669;margin:.8rem 0 .4rem">6.4 Questions for Your Doctor</p>
+  <p style="font-size:.78rem;font-weight:700;color:#059669;margin:.8rem 0 .4rem">6.4 Patient Counseling Points</p>
   <p style="font-size:.72rem;font-weight:700;color:#0891b2;margin:.5rem 0 .3rem">6.4.1 Personalized &mdash; this scan</p>
   <ul style="list-style:none;padding-left:0">{pquest_items}</ul>
   <p style="font-size:.72rem;font-weight:700;color:#64748b;margin:.5rem 0 .3rem">6.4.2 General</p>
@@ -1032,6 +1262,151 @@ def generate_html_clinical_report(
 
 </div><!-- /page -->
 </body></html>"""
+
+
+# Plain-language one-line explanations of each finding, for the patient handout.
+PLAIN_EXPLAIN = {
+    "Intra-axial Glial Neoplasm": (
+        "The AI found an area inside the brain tissue that looks like a glial "
+        "tumor (glioma). Only a biopsy examined under a microscope can confirm "
+        "the exact type and grade."
+    ),
+    "Extra-axial Dural Lesion": (
+        "The AI found a growth on the brain's outer covering (the dura). This "
+        "most commonly turns out to be a meningioma, which is usually benign "
+        "(not cancer)."
+    ),
+    "Sella Turcica Pituitary Adenoma": (
+        "The AI found a growth in the pituitary gland area -- a small gland at "
+        "the base of the brain that makes hormones."
+    ),
+    "No Tumor": "The AI did not find a tumor on this scan.",
+}
+
+
+def _patient_handout_items(pred_class: str, pred_conf: float, area: int) -> dict:
+    """Structured content for the patient handout (plain patient voice).
+
+    Kept as a separate helper so tests can assert on the handout's wording
+    without parsing PDF bytes.
+    """
+    counseling = COUNSELING_DB.get(pred_class, COUNSELING_DB["No Tumor"])
+    plain = PLAIN_FINDING.get(pred_class, pred_class)
+    pg = personalized_guidance(pred_class, pred_conf, area, 0.0, None, None, audience="patient")
+    return {
+        "plain": plain,
+        "explain": PLAIN_EXPLAIN.get(pred_class, ""),
+        "about": pg["about"],
+        "precautions": list(counseling["precautions"]),
+        "questions": list(pg["questions"]) + list(counseling["checklist"]),
+    }
+
+
+def generate_patient_handout_pdf(
+    *,
+    patient_id: str,
+    scan_date: str,
+    pred_class: str,
+    pred_conf: float,
+    area: int,
+) -> bytes:
+    """Generate a plain-language patient handout PDF; return raw bytes.
+
+    AUDIENCE CONTRACT: this is the ONLY surface that uses patient voice
+    ("ask your doctor"). It is a separate, clearly-labeled handout -- never
+    part of the clinical report. Content comes from COUNSELING_DB (patient
+    voice) plus scan-specific items via personalized_guidance(audience="patient").
+    """
+    if not _FPDF_AVAILABLE:  # pragma: no cover - mirrors clinical report guard
+        raise RuntimeError("fpdf2 is not installed; cannot generate patient handout PDF")
+
+    items = _patient_handout_items(pred_class, pred_conf, area)
+    pdf = _ClinicalPDF()  # NB: __init__ already calls add_page()
+    pdf.set_auto_page_break(True, margin=18)
+
+    # -- Header -------------------------------------------------------------
+    pdf.set_fill_color(*_ClinicalPDF.C_TEAL_D)
+    pdf.rect(0, 0, 210, 34, style="F")
+    pdf.set_xy(12, 8)
+    pdf.set_font("Helvetica", "B", 15)
+    pdf.set_text_color(255, 255, 255)
+    pdf.cell(0, 8, "Patient Information Handout", ln=True)
+    pdf.set_x(12)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_text_color(190, 230, 235)
+    pdf.cell(0, 6, "Understanding your brain MRI result  |  NeuroScan AI", ln=True)
+    pdf.set_xy(12, 26)
+    pdf.set_font("Helvetica", "", 7.5)
+    pdf.set_text_color(160, 200, 205)
+    pdf.cell(0, 5, f"Patient ID: {patient_id}      Scan date: {scan_date}", ln=True)
+
+    def _heading(text: str) -> None:
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_text_color(*_ClinicalPDF.C_TEAL_D)
+        pdf.set_x(12)
+        pdf.cell(0, 7, text, ln=True)
+        pdf.ln(1)
+
+    def _para(text: str) -> None:
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(*_ClinicalPDF.C_TEXT)
+        pdf.set_x(14)
+        pdf.multi_cell(182, 5.5, text, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.ln(2)
+
+    pdf.set_y(40)
+
+    _heading("What the scan showed")
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_text_color(*_ClinicalPDF.C_TEXT)
+    pdf.set_x(14)
+    pdf.cell(0, 6, f"AI finding: {items['plain']}", ln=True)
+    pdf.ln(1)
+    _para(items["explain"])
+
+    _heading("What this means")
+    _para(
+        "This handout was generated from an AI-assisted review of your scan. "
+        "It is for information only and is NOT a final diagnosis. Your doctor "
+        "will review the full scan, consider your symptoms and medical history, "
+        "and decide the next steps with you."
+    )
+
+    _heading("Precautions -- warning signs to watch for")
+    _para(
+        "The list below covers general warning signs for this finding. "
+        "Only your doctor can judge how urgent your situation is."
+    )
+    for prec in items["precautions"]:
+        pdf.bullet(prec, color=_ClinicalPDF.C_AMBER)
+    pdf.ln(2)
+
+    _heading("Questions to ask your doctor")
+    _para("Bring this list to your appointment -- tick the questions you want answered.")
+    for i, q in enumerate(items["questions"], start=1):
+        pdf.checklist_item(q, i)
+    pdf.ln(3)
+
+    # -- Disclaimer box ------------------------------------------------------
+    pdf.set_fill_color(255, 251, 235)
+    pdf.set_draw_color(217, 180, 60)
+    y0 = pdf.get_y()
+    pdf.set_xy(12, y0)
+    pdf.set_font("Helvetica", "", 8)
+    pdf.set_text_color(*_ClinicalPDF.C_TEXT)
+    pdf.multi_cell(
+        186,
+        5,
+        "Please note: this handout is generated by an AI decision-support system. "
+        "It does not replace your doctor's advice. If you develop a sudden severe "
+        "headache, vision loss, weakness, or a seizure, seek emergency care immediately.",
+        new_x=XPos.LMARGIN,
+        new_y=YPos.NEXT,
+    )
+    y1 = pdf.get_y()
+    pdf.rect(12, y0 - 2, 186, (y1 - y0) + 4, style="D")
+
+    return bytes(pdf.output())
 
 
 def generate_clinical_report_bytes(

@@ -78,7 +78,7 @@ def test_guidance_split_personalized_before_general():
         ("6.1", "About This Finding"),
         ("6.2", "Precautions"),
         ("6.3", "Recommended Workup"),
-        ("6.4", "Questions for Your Doctor"),
+        ("6.4", "Patient Counseling Points"),
     ]:
         assert title in html, f"{topic} '{title}' missing"
         i1 = html.find(f"{topic}.1")

@@ -27,7 +27,9 @@ from enhancement.pipeline import EnhancementAblationManager, to_display_rgb
 from explainability.gradcam_generator import BrainTumorGradCAM
 from reports.pdf_report_generator import (
     COUNSELING_DB,
+    DOCTOR_GUIDANCE,
     generate_clinical_report_bytes,
+    generate_patient_handout_pdf,
     personalized_guidance,
 )
 from segmentation.unet_model import UNet
@@ -448,7 +450,10 @@ def _run_pipeline(pil_img: Image.Image, pipeline: str) -> dict:
 # The split never changes, so the reader can tell at a glance what came from
 # their image vs what is generic category information.
 def render_guidance(pred_class: str, r: dict) -> None:
+    # Doctor-voiced guidance: this tool is FOR the treating clinician.
+    # The patient handout (separate download below) is the only patient-voiced surface.
     info = COUNSELING_DB.get(pred_class, COUNSELING_DB["No Tumor"])
+    doctor = DOCTOR_GUIDANCE.get(pred_class, DOCTOR_GUIDANCE["No Tumor"])
     plain_name, _ = PLAIN_INFO[pred_class]
     is_tumor = pred_class != "No Tumor"
     pred_conf = float(r["probs"][r["pred_idx"]] * 100)
@@ -457,8 +462,9 @@ def render_guidance(pred_class: str, r: dict) -> None:
     )
     with st.expander(f"📋 Clinical guidance — {plain_name}", expanded=is_tumor):
         st.caption(
-            "Each topic is split in two: .1 is what this scan shows (personalized), "
-            ".2 is general information — not personalised medical advice."
+            "Written for the treating clinician. Each topic is split in two: .1 is what "
+            "this scan shows (personalized), .2 is general information — not personalised "
+            "medical advice."
         )
 
         st.markdown("**6.1 · About this finding**")
@@ -471,22 +477,22 @@ def render_guidance(pred_class: str, r: dict) -> None:
         st.markdown("*6.2.1 · Personalized — this scan*")
         st.write(pg["precautions"])
         st.markdown("*6.2.2 · General*")
-        for p in info["precautions"]:
+        for p in doctor["precautions"]:
             st.markdown(f"- {p}")
 
         st.markdown("**6.3 · Recommended workup**")
         st.markdown("*6.3.1 · Personalized — this scan*")
         st.write(pg["workup"])
         st.markdown("*6.3.2 · General*")
-        for s in info["next_steps"]:
+        for s in doctor["workup"]:
             st.markdown(f"- {s}")
 
-        st.markdown("**6.4 · Questions for your doctor**")
+        st.markdown("**6.4 · Patient counseling points**")
         st.markdown("*6.4.1 · Personalized — this scan*")
         for i, q in enumerate(pg["questions"]):
             st.checkbox(q, key=f"guidance_pq_{pred_class}_{i}")
         st.markdown("*6.4.2 · General*")
-        for i, item in enumerate(info["checklist"]):
+        for i, item in enumerate(doctor["counseling"]):
             st.checkbox(item, key=f"guidance_{pred_class}_{i}")
 
 
@@ -655,5 +661,25 @@ else:
                 )
         except Exception as e:
             st.error(f"Report generation error: {e}")
+
+    # ── Patient handout (separate, plain-language, patient-voiced) ──
+    if st.button("⬇ Download patient handout (PDF)", use_container_width=True):
+        try:
+            handout_bytes = generate_patient_handout_pdf(
+                patient_id=patient_id or "—",
+                scan_date=str(scan_date),
+                pred_class=pred_class,
+                pred_conf=pred_conf,
+                area=r["area"],
+            )
+            st.download_button(
+                label="Download patient handout",
+                data=handout_bytes,
+                file_name=f"neuroscan_handout_{patient_id or 'scan'}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+            )
+        except Exception as e:
+            st.error(f"Handout generation error: {e}")
 
     st.caption("AI-assisted assessment. All findings require review by a qualified radiologist.")
