@@ -50,17 +50,30 @@ class EnhancementAblationManager:
     def process(self, image: np.ndarray, variant: Optional[str] = None) -> np.ndarray:
         """
         FR-015: Fixed execution order: Input -> WPT -> LMMSE -> CLAHE -> Output
+
+        Range contract: every stage preserves the working dynamic range, and
+        the final grayscale/color output is float32 in [0, 1] (grayscale) or
+        matches the input convention for color (uint8 [0, 255] in ->
+        uint8 [0, 255] out; float [0, 1] in -> float [0, 1] out).
         """
         mode = variant if variant is not None else self.default_variant
-        
-        is_color = len(image.shape) == 3
+
+        is_color = image.ndim == 3
         if is_color:
-            # Process luminance channel only to avoid color shifts
+            # Process luminance channel only to avoid color shifts.
+            # OpenCV LAB scaling differs by dtype (verified empirically):
+            #   uint8 input   -> L in [0, 255] (i.e. L*255/100), a/b offset +128
+            #   float32 input -> L in [0, 100], a/b in [-127, 127]
+            # The pipeline normalizes processed luminance to [0, 1], so we only
+            # need to remember which scale to map back to on reconstruction.
             lab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
             l_channel, a, b = cv2.split(lab)
+            lab_is_float = lab.dtype.kind == "f"
             processed = l_channel.astype(np.float32)
         else:
             processed = image.astype(np.float32)
+            lab_is_float = False
+            a = b = None
 
         # Apply WPT if in mode
         if 'wpt' in mode:
@@ -85,9 +98,15 @@ class EnhancementAblationManager:
             # Fail-safe: the pipeline produced a flat/collapsed image.
             # Restore the original slice (pre-pipeline) so callers always
             # receive a usable image rather than a black frame.
-            original_slice = l_channel.astype(np.float32) / 255.0 if is_color else image.astype(np.float32)
-            if original_slice.max() > 1.0 + 1e-5:
-                original_slice = original_slice / 255.0
+            if is_color:
+                # Original luminance in [0, 1]: uint8 L lives in [0, 255],
+                # float32 L in [0, 100].
+                scale = 100.0 if lab_is_float else 255.0
+                original_slice = l_channel.astype(np.float32) / scale
+            else:
+                original_slice = image.astype(np.float32)
+                if original_slice.max() > 1.0 + 1e-5:
+                    original_slice = original_slice / 255.0
             processed = original_slice
             logger.warning(
                 "Enhancement pipeline produced a collapsed output "
@@ -96,21 +115,21 @@ class EnhancementAblationManager:
 
         # Reconstruct color image if necessary
         if is_color:
-            # Preserve continuous range [0.0, 1.0] if input was float
-            if processed.max() <= 1.0 + 1e-5:
-                # Merge logic is complex if returning [0,1] float RGB from LAB,
-                # but the user said "Ensure every stage (WPT -> LMMSE -> CLAHE) preserves continuous range [0.0, 1.0]."
-                # If we convert back to LAB and RGB, OpenCV requires matching scales.
-                # Since L is [0,1], let's scale it to [0,255] just for cv2.cvtColor, then scale back
-                processed_uint8 = np.clip(processed * 255.0, 0, 255).astype(np.uint8)
-                merged = cv2.merge([processed_uint8, a, b])
-                final_image = cv2.cvtColor(merged, cv2.COLOR_LAB2RGB).astype(np.float32) / 255.0
-                return final_image
-            else:
-                processed_uint8 = np.clip(processed, 0, 255).astype(np.uint8)
-                merged = cv2.merge([processed_uint8, a, b])
+            # Map the [0, 1] result back to OpenCV's per-dtype L scale and
+            # merge with the original chroma channels in ONE consistent
+            # dtype (mixing uint8 and float32 channels crashes cv2.merge).
+            if lab_is_float:
+                l_out = (processed * 100.0).astype(np.float32)
+                merged = cv2.merge([l_out,
+                                    a.astype(np.float32),
+                                    b.astype(np.float32)])
                 final_image = cv2.cvtColor(merged, cv2.COLOR_LAB2RGB)
-                return final_image
+                return np.clip(final_image, 0.0, 1.0).astype(np.float32)
+            else:
+                # uint8 LAB expects L in [0, 255] (L*255/100); NOT [0, 100].
+                l_out = np.clip(processed * 255.0, 0, 255).astype(np.uint8)
+                merged = cv2.merge([l_out, a, b])  # all uint8
+                return cv2.cvtColor(merged, cv2.COLOR_LAB2RGB)
         else:
             return processed
 
@@ -118,8 +137,18 @@ def compute_entropy(image: np.ndarray) -> float:
     """Compute image entropy."""
     if len(image.shape) == 3:
         image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-    hist = cv2.calcHist([image.astype(np.uint8)], [0], None, [256], [0, 256])
-    hist = hist.ravel() / hist.sum()
+    if image.dtype.kind == "f":
+        # Scale float images to [0, 255] before histogramming: a direct
+        # uint8 cast of a [0, 1] image collapses everything to 0 and
+        # silently returns entropy 0 (fixed).
+        img_u8 = np.clip(image * 255.0, 0, 255).astype(np.uint8)
+    else:
+        img_u8 = np.clip(image, 0, 255).astype(np.uint8)
+    hist = cv2.calcHist([img_u8], [0], None, [256], [0, 256])
+    total = hist.sum()
+    if total <= 0:
+        return 0.0
+    hist = hist.ravel() / total
     return entropy(hist, base=2)
 
 def compute_cnr(image: np.ndarray, signal_mask: np.ndarray, bg_mask: np.ndarray) -> float:
@@ -148,8 +177,14 @@ def evaluate_metrics(original: np.ndarray, processed: np.ndarray) -> dict:
         orig_gray, proc_gray = original, processed
         
     # PSNR & SSIM
-    data_range = proc_gray.max() - proc_gray.min()
-    data_range = max(1.0, float(data_range)) # Avoid zero division
+    # data_range must be the maximum *possible* value for the dtype, not the
+    # observed range — using the observed range artificially inflates PSNR.
+    if proc_gray.dtype == np.uint8:
+        data_range = 255.0
+    elif float(proc_gray.max()) > 1.5:
+        data_range = 255.0  # float image in [0, 255] convention
+    else:
+        data_range = 1.0    # float image in [0, 1] convention
     
     val_psnr = psnr(orig_gray, proc_gray, data_range=data_range)
     val_ssim = ssim(orig_gray, proc_gray, data_range=data_range)

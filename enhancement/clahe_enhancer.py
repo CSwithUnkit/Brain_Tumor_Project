@@ -11,21 +11,27 @@ def apply_clahe(image: np.ndarray, clip_limit: float = 2.0, tile_grid_size: tupl
         tile_grid_size: Size of grid for histogram equalization (default: (8, 8))
         
     Returns:
-        Enhanced image of the same type and range as input.
+        Enhanced image with the same dtype and dynamic range as the input
+        (previous versions silently remapped float [0, 255] inputs to [0, 1]).
     """
-    if image.dtype in [np.float32, np.float64]:
-        # Ensure range is strictly [0, 255] before uint8 cast
-        if image.max() <= 1.0 + 1e-5:
-            img_uint8 = np.clip(image * 255.0, 0, 255).astype(np.uint8)
-        else:
-            img_uint8 = np.clip(image, 0, 255).astype(np.uint8)
+    is_float = image.dtype in (np.float32, np.float64)
+    if is_float:
+        in_min, in_max = float(image.min()), float(image.max())
+        span = in_max - in_min
+        if span < 1e-8:
+            # Flat image: CLAHE is the identity.
+            return image.astype(np.float32)
+        # Map to the uint8 working range OpenCV CLAHE requires.
+        img_uint8 = np.clip((image - in_min) / span * 255.0, 0, 255).astype(np.uint8)
     else:
         img_uint8 = np.clip(image, 0, 255).astype(np.uint8)
-        
+
     # Apply CLAHE
     clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
     enhanced = clahe.apply(img_uint8)
-    
-    if image.dtype in [np.float32, np.float64]:
-        return (enhanced.astype(np.float32) / 255.0) # Return normalized
+
+    if is_float:
+        # Map back to the input's original dynamic range.
+        out = enhanced.astype(np.float32) / 255.0 * span + in_min
+        return np.clip(out, in_min, in_max).astype(np.float32)
     return enhanced

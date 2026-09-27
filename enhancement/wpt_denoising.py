@@ -9,9 +9,17 @@ def reconstruct_wpt(
 ) -> np.ndarray:
   """2D Multi-resolution Wavelet Sub-band Denoising (WPT/2D DWT) for Brain MRI.
 
-  Decomposes into sub-bands, applies BayesShrink soft-thresholding strictly to
+  Decomposes into sub-bands, applies adaptive soft-thresholding strictly to
   high-frequency detail bands, and fully preserves the low-frequency
   approximation sub-band (cA) to guarantee anatomical contrast.
+
+  The detail threshold is a scaled universal threshold
+  ``t = 0.15 * sigma * sqrt(2 * log(N))`` where ``sigma`` is the MAD noise
+  estimate of the sub-band. The 0.15 attenuation factor keeps the filter
+  conservative on MRI texture.
+
+  Returns:
+      Denoised image as float32 in the **same dynamic range as the input**.
   """
   if image is None:
     return image
@@ -24,7 +32,8 @@ def reconstruct_wpt(
   img_min = float(img.min())
   img_max = float(img.max())
   if (img_max - img_min) < 1e-5:
-    return np.clip(img, 0.0, 1.0).astype(np.float32)
+    # Flat image: denoising is the identity, preserve input range.
+    return img.astype(np.float32)
 
   # Normalize locally to [0.0, 1.0]
   norm = (img - img_min) / (img_max - img_min)
@@ -42,11 +51,11 @@ def reconstruct_wpt(
   for detail_tuple in coeffs[1:]:
     new_details = []
     for d in detail_tuple:
-      non_zero = d[np.abs(d) > 1e-4]
-      if len(non_zero) > 10:
-        sigma = float(np.median(np.abs(non_zero)) / 0.6745)
-      else:
-        sigma = 0.005
+      # MAD noise estimate over the FULL detail sub-band (unbiased).
+      # (Previous code dropped near-zero coefficients first, which biased
+      # the median upward and over-thresholded fine detail.)
+      sigma = float(np.median(np.abs(d)) / 0.6745)
+      sigma = max(sigma, 1e-6)
 
       thresh = sigma * np.sqrt(2.0 * np.log(norm.size)) * 0.15
       d_thresh = pywt.threshold(d, value=thresh, mode="soft")
@@ -58,12 +67,15 @@ def reconstruct_wpt(
   if rec.shape != orig_shape:
     rec = cv2.resize(rec, (orig_shape[1], orig_shape[0]))
 
-  # Restore original dynamic range and return normalized float32
+  # Restore original dynamic range. NOTE: clip bounds must be the input's
+  # own [img_min, img_max] — clipping a [0, 255] restoration to [0, 1]
+  # squashed every enhanced image to near-white (fixed).
   rec = rec * (img_max - img_min) + img_min
-  rec = np.clip(rec, 0.0, 1.0).astype(np.float32)
+  rec = np.clip(rec, img_min, img_max).astype(np.float32)
 
   # Fail-safe check: if output collapsed, fall back to input
   if rec.max() - rec.min() < 1e-3:
-    return np.clip(norm, 0.0, 1.0).astype(np.float32)
+    return np.clip(norm * (img_max - img_min) + img_min,
+                   img_min, img_max).astype(np.float32)
 
   return rec
