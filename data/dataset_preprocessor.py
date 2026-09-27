@@ -57,6 +57,43 @@ def get_seg_transforms(split: str, target_size: Tuple[int, int] = (256, 256)) ->
             T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
 
+# ── Enhanced-image cache path helpers (M13: basename collision fix) ─────────
+def cached_enhanced_target(image_path: str, cache_dir: str = 'data/cached_enhanced') -> str:
+    """
+    Target path for WRITING a new cache entry.
+
+    Preserves the directory structure relative to data/brisc, so images with
+    the same basename in different classes (e.g. glioma/img_001.jpg vs
+    meningioma/img_001.jpg) never collide. Previously the cache was flat
+    (basename only), so one class's enhanced image silently overwrote the
+    other's and Exp2/Exp3 could train on the WRONG image.
+    """
+    p = image_path.replace('\\', '/')
+    idx = p.find('data/brisc/')
+    rel = p[idx + len('data/brisc/'):].lstrip('/') if idx != -1 else os.path.basename(image_path)
+    return os.path.join(cache_dir, rel)
+
+
+def find_cached_enhanced(image_path: str, cache_dir: str = 'data/cached_enhanced') -> Optional[str]:
+    """
+    Resolve an EXISTING cache entry for a raw image path.
+
+    Checks the structured layout first, then the legacy flat basename layout
+    (for caches written by older code). Returns None if not cached.
+    """
+    p = image_path.replace('\\', '/')
+    idx = p.find('data/brisc/')
+    if idx != -1:
+        rel = p[idx + len('data/brisc/'):].lstrip('/')
+        candidate = os.path.join(cache_dir, rel)
+        if os.path.exists(candidate):
+            return candidate
+    legacy = os.path.join(cache_dir, os.path.basename(image_path))
+    if os.path.exists(legacy):
+        return legacy
+    return None
+
+
 def split_dataset(data: List[Dict[str, Any]], stratify_col: str = 'class', random_state: int = 42) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]:
     """
     FR-011: Split data into Train (70%), Validation (15%), and Test (15%) using stratified splitting.

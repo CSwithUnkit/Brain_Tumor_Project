@@ -1,7 +1,15 @@
 import os
-import sys
 import logging
+import subprocess
 from pathlib import Path
+
+# Canonical on-disk layout — MUST match data/dataset_ingestion.py, which
+# globs data/brisc and data/pmram (previously this module created
+# datasets/raw/... while ingestion searched data/..., so downloaded data
+# was never found).
+BRISC_RAW_DIR = Path("data") / "brisc"
+PMRAM_RAW_DIR = Path("data") / "pmram"
+CACHED_ENHANCED_DIR = Path("data") / "cached_enhanced"
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -42,18 +50,15 @@ def setup_environment() -> Path:
     return base_dir
 
 def create_directory_structure(base_dir: Path) -> None:
-    """Creates the necessary folder structure."""
+    """Creates the necessary folder structure (canonical data/ layout)."""
     dirs_to_create = [
-        base_dir / "datasets" / "raw" / "brisc",
-        base_dir / "datasets" / "raw" / "pmram",
-        base_dir / "datasets" / "processed" / "train",
-        base_dir / "datasets" / "processed" / "val",
-        base_dir / "datasets" / "processed" / "test",
+        base_dir / BRISC_RAW_DIR,
+        base_dir / PMRAM_RAW_DIR,
+        base_dir / CACHED_ENHANCED_DIR,
         base_dir / "checkpoints" / "unet",
-        base_dir / "checkpoints" / "efficientnetb2",
+        base_dir / "checkpoints" / "classification",
         base_dir / "logs",
-        base_dir / "configs",
-        base_dir / "data"
+        base_dir / "results",
     ]
     
     for d in dirs_to_create:
@@ -62,21 +67,31 @@ def create_directory_structure(base_dir: Path) -> None:
 
 def download_datasets(base_dir: Path) -> None:
     """
-    Automates downloading of datasets using Kaggle API or direct URL.
+    Download datasets using the Kaggle API into the canonical data/ layout.
+
+    Raises NotImplementedError until real Kaggle dataset IDs are configured —
+    previously this function only LOGGED "downloading..." while doing
+    nothing, silently leaving an empty dataset behind.
     """
-    logger.info("Starting dataset download process...")
-    
-    # BRISC Dataset
-    brisc_dir = base_dir / "datasets" / "raw" / "brisc"
-    logger.info(f"Downloading BRISC dataset to {brisc_dir}...")
-    # NOTE: Replace 'brisc-dataset-name' with actual Kaggle dataset ID
-    # os.system(f"kaggle datasets download -d brisc-dataset-name -p {brisc_dir} --unzip")
-    
-    # PMRAM Dataset
-    pmram_dir = base_dir / "datasets" / "raw" / "pmram"
-    logger.info(f"Downloading PMRAM dataset to {pmram_dir}...")
-    # NOTE: Replace 'pmram-dataset-name' with actual Kaggle dataset ID
-    # os.system(f"kaggle datasets download -d pmram-dataset-name -p {pmram_dir} --unzip")
+    brisc_id = os.environ.get("BRISC_KAGGLE_ID", "").strip()
+    pmram_id = os.environ.get("PMRAM_KAGGLE_ID", "").strip()
+    if not brisc_id or not pmram_id:
+        raise NotImplementedError(
+            "Dataset download is not configured: set the BRISC_KAGGLE_ID and "
+            "PMRAM_KAGGLE_ID environment variables to the Kaggle dataset slugs "
+            "(e.g. export BRISC_KAGGLE_ID='your-username/brisc-dataset'), "
+            "place kaggle.json at ~/.kaggle/kaggle.json (chmod 600), then re-run."
+        )
+
+    for dataset_id, target in ((brisc_id, base_dir / BRISC_RAW_DIR),
+                               (pmram_id, base_dir / PMRAM_RAW_DIR)):
+        logger.info(f"Downloading {dataset_id} to {target}...")
+        subprocess.run(
+            ["kaggle", "datasets", "download", "-d", dataset_id,
+             "-p", str(target), "--unzip"],
+            check=True,
+        )
+    logger.info("Dataset download complete.")
 
 if __name__ == "__main__":
     logger.info("--- Setup and Download Script ---")

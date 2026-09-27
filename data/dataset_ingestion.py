@@ -7,8 +7,15 @@ logging.basicConfig(level=logging.INFO, format='%(message)s')
 logger = logging.getLogger(__name__)
 
 class DatasetIngestor:
+    # Minimum expected counts guard against silently ingesting a partial or
+    # wrong dataset. Overridable via env for smaller/dev datasets.
+    MIN_CLASSIFICATION_IMAGES = int(os.environ.get("BRISC_MIN_CLASSIFICATION", "6000"))
+    MIN_SEGMENTATION_PAIRS = int(os.environ.get("BRISC_MIN_SEGMENTATION", "4700"))
+
     def __init__(self):
-        self.base_dir = Path(os.getcwd())
+        # Resolve from this file's location, not the process CWD — ingestion
+        # must work no matter where it is invoked from.
+        self.base_dir = Path(__file__).resolve().parent.parent
         self.brisc_dir = self.base_dir / 'data/brisc'
         self.pmram_dir = self.base_dir / 'data/pmram'
         self.brisc_classes = ['glioma', 'meningioma', 'pituitary', 'no_tumor']
@@ -24,18 +31,23 @@ class DatasetIngestor:
         logger.info("ℹ️ [INFO] Starting ultra-fast structural mapping of BRISC...")
         brisc_data = {'classification': [], 'segmentation': []}
         
-        # 1. High-Speed Classification Mapping
+        # 1. High-Speed Classification Mapping (case-insensitive, multi-extension)
         for class_name in self.brisc_classes:
-            for img_path in self.brisc_dir.rglob(f'**/{class_name}/*.jpg'):
-                brisc_data['classification'].append({
-                    'path': self._to_rel(img_path),
-                    'class': class_name
-                })
+            for ext in ("*.jpg", "*.JPG", "*.jpeg", "*.JPEG", "*.png", "*.PNG"):
+                for img_path in self.brisc_dir.rglob(f'**/{class_name}/{ext}'):
+                    brisc_data['classification'].append({
+                        'path': self._to_rel(img_path),
+                        'class': class_name
+                    })
 
         # 2. High-Speed Segmentation Mapping
         # Map images directly by stem
-        image_paths = list(self.brisc_dir.rglob('**/segmentation_task/**/images/*.jpg'))
-        mask_paths = {p.stem.replace('_mask', ''): p for p in self.brisc_dir.rglob('**/segmentation_task/**/masks/*.png')}
+        image_paths = [p for ext in ("*.jpg", "*.JPG", "*.jpeg", "*.JPEG", "*.png", "*.PNG")
+                       for p in self.brisc_dir.rglob(f'**/segmentation_task/**/images/{ext}')]
+        mask_paths = {}
+        for ext in ("*.png", "*.PNG", "*.jpg", "*.JPG"):
+            for p in self.brisc_dir.rglob(f'**/segmentation_task/**/masks/{ext}'):
+                mask_paths.setdefault(p.stem.replace('_mask', ''), p)
 
         for img_path in image_paths:
             stem = img_path.stem
@@ -49,10 +61,23 @@ class DatasetIngestor:
         seg_count = len(brisc_data['segmentation'])
         
         logger.info(f"✅ [SUCCESS] Mapped {class_count} classification images and {seg_count} segmentation pairs.")
-        
-        assert class_count >= 6000, f"Expected >= 6000 classification images, found {class_count}"
-        assert seg_count >= 4700, f"Expected >= 4700 segmentation pairs, found {seg_count}"
-        
+
+        # Explicit validation (not assert: asserts are stripped under -O and
+        # give no actionable message). Minimums are env-overridable for
+        # smaller/dev datasets.
+        if class_count < self.MIN_CLASSIFICATION_IMAGES:
+            raise RuntimeError(
+                f"BRISC classification image count {class_count} < minimum "
+                f"{self.MIN_CLASSIFICATION_IMAGES}. Is data/brisc populated? "
+                f"(override: BRISC_MIN_CLASSIFICATION env var)"
+            )
+        if seg_count < self.MIN_SEGMENTATION_PAIRS:
+            raise RuntimeError(
+                f"BRISC segmentation pair count {seg_count} < minimum "
+                f"{self.MIN_SEGMENTATION_PAIRS}. Is data/brisc populated? "
+                f"(override: BRISC_MIN_SEGMENTATION env var)"
+            )
+
         return brisc_data
 
     def ingest_pmram(self):
