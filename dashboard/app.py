@@ -1,7 +1,5 @@
-import os
 import sys
 from pathlib import Path
-import json
 from datetime import datetime
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -13,14 +11,11 @@ import torch
 import cv2
 import numpy as np
 from PIL import Image
-import pandas as pd
-from typing import Tuple, Optional
 
 # Dynamic hardware profiler — works on CPU, CUDA, Google Colab, and Windows
 from utils.device_config import get_system_execution_profile
 
-# Detect hardware once at module load (Streamlit caches the module across reruns)
-_HW_PROFILE = get_system_execution_profile()
+# Hardware profile is resolved inside load_models() via get_system_execution_profile().
 
 from enhancement.pipeline import EnhancementAblationManager, to_display_rgb
 from segmentation.unet_model import UNet
@@ -813,14 +808,14 @@ institution = st.sidebar.text_input("Institution", value="ITS Engineering Colleg
 st.sidebar.divider()
 st.sidebar.markdown(_sbhead("ai", "AI Configuration"), unsafe_allow_html=True)
 model_choice = st.sidebar.selectbox("Active Pipeline", [
-    "Exp 2: Enhanced (98.2%)",
-    "Exp 1: Baseline (98.9%)",
+    "Exp 2: Enhanced",
+    "Exp 1: Baseline",
     "Exp 3: Seg-Guided"], index=0)
 
 model_map = {
-    "Exp 1: Baseline (98.9%)"  : "classification/best_efficientnet_exp1_baseline.pth",
-    "Exp 2: Enhanced (98.2%)"  : "classification/best_efficientnet_exp2_enhanced.pth",
-    "Exp 3: Seg-Guided"        : "classification/best_efficientnet_exp3_seg_guided.pth",
+    "Exp 1: Baseline"  : "classification/best_efficientnet_exp1_baseline.pth",
+    "Exp 2: Enhanced"  : "classification/best_efficientnet_exp2_enhanced.pth",
+    "Exp 3: Seg-Guided": "classification/best_efficientnet_exp3_seg_guided.pth",
 }
 
 st.sidebar.divider()
@@ -841,25 +836,6 @@ st.sidebar.markdown(status_html(f"Classifier ({model_choice[:5]})", class_path.e
 
 if not class_path.exists() or not seg_path.exists():
     st.sidebar.warning("Model weights missing. Train on Colab to enable live inference.")
-
-# ── Hardware badge ────────────────────────────────────────────────────────────
-st.sidebar.divider()
-st.sidebar.markdown(_sbhead("hw", "Inference Hardware"), unsafe_allow_html=True)
-_p = _HW_PROFILE
-if _p["has_cuda"]:
-    _hw_label = f"GPU · {_p['gpu_name']}"
-    _hw_sub   = f"{_p['vram_gb']:.1f} GB VRAM · AMP fp16"
-    _hw_color = "#16A34A"
-else:
-    _hw_label = "CPU"
-    _hw_sub   = f"{_p['total_ram_gb']:.1f} GB RAM · {_p['num_workers']} workers"
-    _hw_color = "#0891B2"
-_ort_badge = "PyTorch"
-st.sidebar.markdown(
-    f'<span style="font-size:13px;color:{_hw_color};font-weight:600;font-family:Noto Sans,sans-serif">{_hw_label}</span><br>'
-    f'<span style="font-size:12px;color:#64748B;font-family:Noto Sans,sans-serif">{_hw_sub} · {_ort_badge}</span>',
-    unsafe_allow_html=True
-)
 
 # ── Letterhead Header ──────────────────────────────────────────────────────────
 st.markdown(f"""
@@ -915,7 +891,7 @@ CLASSES = ['Intra-axial Glial Neoplasm', 'Extra-axial Dural Lesion', 'Sella Turc
 # ── Clinical counseling knowledge base ───────────────────────────────────────
 # Full neuro-oncological counseling text keyed by predicted class.
 # Imported into the dashboard expander and forwarded to the PDF generator.
-from reports.pdf_report_generator import COUNSELING_DB, generate_pdf_report, generate_clinical_report_bytes
+from reports.pdf_report_generator import COUNSELING_DB, generate_clinical_report_bytes
 
 # ── Counseling HTML helpers ───────────────────────────────────────────────────
 def _c_bullet(text: str, dot_class: str = "") -> str:
@@ -1134,7 +1110,7 @@ if upload is not None:
                   <tr><th>Metric</th><th style="text-align:right">Value</th></tr>
                 </thead>
                 <tbody>
-                  <tr><td>Tumor Area</td><td>{area:,} px&sup2; &asymp; {area/100:.1f} mm&sup2;</td></tr>
+                  <tr><td>Tumor Area</td><td>{area:,} px&sup2; <span style="color:#A1A1AA">(physical mm&sup2; needs DICOM pixel-spacing)</span></td></tr>
                   <tr><td>CNR Gain</td><td>{cnr:+.1f}%</td></tr>
                   <tr><td>Perimeter</td><td>{perim:.0f} px</td></tr>
                   <tr><td>Centroid (X, Y)</td><td>{centroid if centroid else '&mdash;'}</td></tr>
@@ -1158,11 +1134,11 @@ if upload is not None:
     # ── PDF Export Button ──────────────────────────────────────────────────────
     st.markdown("""
     <div style="margin-top:24px;padding:16px 24px;background:var(--bg-card);border:1px solid var(--border);border-left:4px solid var(--primary);border-radius:8px">
-      <div style="font-size:15px;font-weight:600;color:var(--text-hi);font-family:'Figtree','Noto Sans',sans-serif;margin-bottom:4px">Export Official Diagnostic Report</div>
-      <div style="font-size:13px;color:var(--text-muted);font-family:'Noto Sans',sans-serif;line-height:1.6">Generate a complete PDF clinical report including scan images, morphometric biomarkers, confidence distribution, and patient counseling guidelines.</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text-hi);font-family:'Figtree','Noto Sans',sans-serif;margin-bottom:4px">Export AI-Assisted Assessment Report</div>
+      <div style="font-size:13px;color:var(--text-muted);font-family:'Noto Sans',sans-serif;line-height:1.6">Generate a PDF assessment report including scan images, morphometric measurements, confidence distribution, and patient counseling guidelines. For clinical use only after review by a qualified radiologist.</div>
     </div>""", unsafe_allow_html=True)
 
-    if st.button("Export Official Diagnostic Report (PDF)", type="primary", use_container_width=True):
+    if st.button("Export AI-Assisted Assessment Report (PDF)", type="primary", use_container_width=True):
         try:
             report_bytes, mime, ext = generate_clinical_report_bytes(
                 patient_id   = patient_id,
@@ -1222,7 +1198,7 @@ else:
         </svg>
       </div>
       <div class="empty-title">Awaiting MRI Scan</div>
-      <div class="empty-sub">Upload a DICOM-compatible diagnostic scan using the sidebar to begin AI-assisted neuro-oncology analysis.</div>
+      <div class="empty-sub">Upload an MRI scan image (PNG / JPG) using the sidebar to begin AI-assisted neuro-oncology analysis.</div>
       <div class="empty-cap-list">
         <span class="empty-cap">WPT Enhancement</span>
         <span class="empty-cap">U-Net Segmentation</span>
