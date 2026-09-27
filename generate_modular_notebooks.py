@@ -212,6 +212,7 @@ print("✅ Dataset integrity verified")'''),
 import os, cv2, glob, numpy as np, shutil
 from tqdm.auto import tqdm
 from enhancement.pipeline import EnhancementAblationManager
+from data.dataset_preprocessor import cached_enhanced_target
 
 CACHE_DIR = "data/cached_enhanced"
 
@@ -248,9 +249,11 @@ for path in tqdm(image_paths, desc="WPT\\u2192LMMSE\\u2192CLAHE", unit="img", dy
     img_float = img.astype(np.float32) / 255.0
     enhanced  = manager.process(img_float)   # returns float32 in [0, 1]
     enhanced_uint8 = np.clip(enhanced * 255.0, 0, 255).astype(np.uint8)
-    cv2.imwrite(os.path.join(CACHE_DIR, os.path.basename(path)), enhanced_uint8)
+    target = cached_enhanced_target(path, CACHE_DIR)
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    cv2.imwrite(target, enhanced_uint8)
 
-total_cached = len(os.listdir(CACHE_DIR))
+total_cached = sum(1 for _ in glob.glob(f"{CACHE_DIR}/**/*.*", recursive=True))
 print(f"\\n\\u2705 Enhancement caching complete!")
 print(f"   Total cached images : {total_cached:,}")
 print(f"   Errors (unreadable) : {errors}")'''),
@@ -272,7 +275,7 @@ CACHE_DIR = "data/cached_enhanced"
 
 # ── Cache health check: auto-delete any near-zero (corrupted) entries ────────
 stale = []
-for p in glob.glob(f"{CACHE_DIR}/*.png") + glob.glob(f"{CACHE_DIR}/*.jpg"):
+for p in glob.glob(f"{CACHE_DIR}/**/*.png", recursive=True) + glob.glob(f"{CACHE_DIR}/**/*.jpg", recursive=True):
     img = cv2.imread(p, cv2.IMREAD_GRAYSCALE)
     if img is None or img.max() <= 5:
         stale.append(p)
@@ -283,7 +286,7 @@ if stale:
 
 # ── Collect all valid cached images (JPG and PNG) ────────────────────────
 cached_paths = sorted(
-    glob.glob(f"{CACHE_DIR}/*.jpg") + glob.glob(f"{CACHE_DIR}/*.png")
+    glob.glob(f"{CACHE_DIR}/**/*.jpg", recursive=True) + glob.glob(f"{CACHE_DIR}/**/*.png", recursive=True)
 )
 print(f"\\u2705 {len(cached_paths):,} valid enhanced images available for QC")
 
