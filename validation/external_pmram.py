@@ -2,13 +2,12 @@ import os
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import cv2
 import pandas as pd
 import numpy as np
 import torch
-from sklearn.metrics import accuracy_score, precision_recall_fscore_support, confusion_matrix
 import tqdm
 
 from classification.classifier_model import BrainTumorClassifier
@@ -36,12 +35,30 @@ _FOLDER_CLASS_RULES: List[Tuple[str, int]] = [
 _IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"}
 
 
+def _sha256_of_file(path: str, chunk: int = 1 << 20) -> str:
+    """SHA-256 hex digest of a file (checkpoint provenance)."""
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(chunk), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
 def _folder_to_class(folder_name: str) -> Optional[int]:
     """
     Map a PMRAM folder name to a class index using case-insensitive substring
     matching. Returns None if no rule matches (folder should be skipped).
     """
     lower = folder_name.lower()
+    # Guard: "abnormal" contains the substring "normal" but means the OPPOSITE
+    # (a tumor class). Without this, an "abnormal/..." folder would be
+    # silently labeled no_tumor (class 3). Skip such ambiguous folders unless
+    # a specific tumor class also matches.
+    if "abnormal" in lower and not any(
+        s in lower for s, _ in _FOLDER_CLASS_RULES[:3]
+    ):
+        return None
     for substring, class_idx in _FOLDER_CLASS_RULES:
         if substring in lower:
             return class_idx
@@ -54,13 +71,28 @@ def _is_augmented(path: str) -> bool:
     return "augmented" in lower
 
 
-def _preprocess_image(img_bgr: np.ndarray) -> torch.Tensor:
+def _preprocess_image(img_bgr: np.ndarray, enhanced: bool = True,
+                      enhancer=None) -> torch.Tensor:
     """
     BGR uint8 → (1, 3, 256, 256) float32 tensor with ImageNet normalisation.
-    Matches the preprocessing used during BRISC training.
+
+    CRITICAL (C1): the preprocessing MUST match the distribution the evaluated
+    model was trained on. The default model (best_efficientnet_exp2_enhanced)
+    was trained on WPT→LMMSE→CLAHE enhanced images, so enhancement is applied
+    by default (enhanced=True). Evaluating it on raw images (the old behavior)
+    measures the wrong distribution and invalidates the reported accuracy.
+    Pass enhanced=False only for models trained on raw images (e.g. exp1).
     """
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-    img_rs  = cv2.resize(img_rgb, (256, 256)).astype(np.float32) / 255.0
+    img_rs = cv2.resize(img_rgb, (256, 256)).astype(np.float32) / 255.0
+    if enhanced:
+        if enhancer is None:
+            raise RuntimeError(
+                "enhanced=True but no enhancement pipeline supplied. "
+                "This is a validator bug, not a data problem."
+            )
+        img_rs = enhancer.process(img_rs)  # float32 [0, 1], same as training cache
+        img_rs = np.clip(img_rs, 0.0, 1.0)
     img_norm = (img_rs - _MEAN) / _STD                  # (256, 256, 3)
     tensor = torch.from_numpy(img_norm.transpose(2, 0, 1)).unsqueeze(0)  # (1,3,256,256)
     return tensor
@@ -83,11 +115,35 @@ class PMRAMValidator:
         pmram_meta_path: str,
         brisc_metrics_path: str,
         pmram_root: Optional[str] = None,
+        preprocessing: str = "enhanced",
     ):
+        if preprocessing not in ("enhanced", "raw"):
+            raise ValueError(f"preprocessing must be 'enhanced' or 'raw', got {preprocessing!r}")
         self.model_path        = model_path
         self.pmram_meta_path   = pmram_meta_path
         self.brisc_metrics_path = brisc_metrics_path
-        
+        self.preprocessing     = preprocessing
+
+        # Sanity: the preprocessing must match the model's training
+        # distribution. exp1_baseline trained on raw images; exp2_enhanced and
+        # exp3_* trained on WPT→LMMSE→CLAHE enhanced images.
+        _name = os.path.basename(model_path).lower()
+        if "exp1" in _name and preprocessing == "enhanced":
+            logger.warning(
+                "⚠️ Model filename suggests exp1 (trained on RAW images) but "
+                "preprocessing='enhanced'. Pass --preprocessing raw for exp1."
+            )
+        if ("exp2" in _name or "exp3" in _name) and preprocessing == "raw":
+            logger.warning(
+                "⚠️ Model filename suggests exp2/exp3 (trained on ENHANCED images) "
+                "but preprocessing='raw'. This measures the wrong distribution."
+            )
+
+        self.enhancer = None
+        if preprocessing == "enhanced":
+            from enhancement.pipeline import EnhancementAblationManager
+            self.enhancer = EnhancementAblationManager()  # WPT→LMMSE→CLAHE, same as training
+
         from utils.device_config import get_system_execution_profile
         profile = get_system_execution_profile()
         self.device = profile['device']
@@ -104,18 +160,19 @@ class PMRAMValidator:
 
     # ------------------------------------------------------------------
     def load_model(self) -> BrainTumorClassifier:
+        # CRITICAL (C3, fail-hard): a missing checkpoint used to only log a
+        # warning and evaluate RANDOMLY INITIALIZED weights while still
+        # writing results/pmram_external_validation.json — i.e. publishing
+        # fake external-validation numbers. Refuse instead.
         if not os.path.exists(self.model_path):
-            alt_path = 'checkpoints/classification/best_efficientnet_exp1_baseline.pth'
-            if os.path.exists(alt_path):
-                logger.info(f"Primary model not found. Falling back to {alt_path}")
-                self.model_path = alt_path
+            raise FileNotFoundError(
+                f"PMRAM validation: classifier checkpoint not found at "
+                f"{self.model_path}. Refusing to evaluate uninitialized weights."
+            )
 
         model = BrainTumorClassifier(num_classes=4, pretrained=False)
-        if os.path.exists(self.model_path):
-            model.load_state_dict(torch.load(self.model_path, map_location=self.device, weights_only=True))
-            logger.info(f"Loaded classifier from {self.model_path}")
-        else:
-            logger.warning(f"Model path {self.model_path} not found. Using uninitialized weights.")
+        model.load_state_dict(torch.load(self.model_path, map_location=self.device, weights_only=True))
+        logger.info(f"Loaded classifier from {self.model_path}")
         model.to(self.device)
         model.eval()
         return model
@@ -274,7 +331,11 @@ class PMRAMValidator:
                         errors += 1
                         continue
 
-                    tensor = _preprocess_image(img_bgr).to(self.device)
+                    tensor = _preprocess_image(
+                        img_bgr,
+                        enhanced=(self.preprocessing == "enhanced"),
+                        enhancer=self.enhancer,
+                    ).to(self.device)
 
                     with torch.amp.autocast('cuda', enabled=self.device.type == 'cuda'):
                         logits = model(tensor)
@@ -315,12 +376,19 @@ class PMRAMValidator:
             'generalization_gap':     gap,
             'num_samples_evaluated':  len(all_labels),
             'data_source':            'folder_walk',
+            # Provenance (C3): exactly which artifact produced these numbers.
+            'checkpoint_path':        os.path.abspath(self.model_path),
+            'checkpoint_sha256':      _sha256_of_file(self.model_path),
+            'preprocessing':          self.preprocessing,  # 'enhanced' = WPT→LMMSE→CLAHE, must match training
         }
 
         os.makedirs('results', exist_ok=True)
         out_path = 'results/pmram_external_validation.json'
-        with open(out_path, 'w') as f:
+        # Atomic write: never leave a half-written JSON behind on crash.
+        tmp_path = out_path + '.tmp'
+        with open(tmp_path, 'w') as f:
             json.dump(results, f, indent=4)
+        os.replace(tmp_path, out_path)
 
         logger.info(f"Validation completed. Accuracy: {metrics['accuracy']:.4f}")
         logger.info(f"Results saved to {out_path}")
@@ -336,9 +404,12 @@ if __name__ == '__main__':
     parser.add_argument('--model_path',  default='checkpoints/classification/best_efficientnet_exp2_enhanced.pth')
     parser.add_argument('--pmram_root',  default='data/pmram',
                         help='Root directory of the PMRAM dataset (folder-walk mode)')
-    parser.add_argument('--pmram_meta',  default='datasets/raw/pmram/pmram_metadata.csv',
-                        help='CSV metadata fallback path')
-    parser.add_argument('--brisc_metrics', default='results/metrics_exp3_seg_guided.json')
+    parser.add_argument('--pmram_meta',  default='data/pmram/pmram_metadata.csv',
+                        help='CSV metadata fallback path (legacy; folder-walk is authoritative)')
+    parser.add_argument('--brisc_metrics', default='results/metrics_exp2_enhanced_test.json')
+    parser.add_argument('--preprocessing', default='enhanced', choices=['enhanced', 'raw'],
+                        help="Input distribution the model was TRAINED on: 'enhanced' "
+                             "applies WPT→LMMSE→CLAHE (exp2/exp3), 'raw' skips it (exp1).")
     args = parser.parse_args()
 
     validator = PMRAMValidator(
@@ -346,5 +417,6 @@ if __name__ == '__main__':
         pmram_meta_path=args.pmram_meta,
         brisc_metrics_path=args.brisc_metrics,
         pmram_root=args.pmram_root,
+        preprocessing=args.preprocessing,
     )
     validator.validate()
