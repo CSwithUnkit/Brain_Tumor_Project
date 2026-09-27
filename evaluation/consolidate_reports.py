@@ -8,8 +8,6 @@ from typing import Any, Dict, Optional
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import matplotlib.gridspec as gridspec
 import numpy as np
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -66,6 +64,7 @@ class ReportConsolidator:
         # the paths were ALWAYS the real repo, so the test suite overwrote
         # the actual reports/ directory (fixed).
         _ROOT = Path(project_root).resolve() if project_root else Path(__file__).resolve().parent.parent
+        self.project_root = str(_ROOT)
         self.results_dir = str(_ROOT / 'results')
         self.reports_dir = str(_ROOT / 'reports')
         self.figures_dir = str(_ROOT / 'reports' / 'figures')
@@ -261,12 +260,22 @@ class ReportConsolidator:
         # Load data
         hist1 = self._load(f'{self.results_dir}/metrics_exp1_baseline.json') or []
         hist2 = self._load(f'{self.results_dir}/metrics_exp2_enhanced.json') or []
-        unet  = self._load(f'{self.results_dir}/unet_metrics.json') or self._load('checkpoints/unet/unet_training_history_enhanced.json') or []
+        unet  = self._load(f'{self.results_dir}/unet_metrics.json') or self._load(f'{self.project_root}/checkpoints/unet/unet_training_history_enhanced.json') or []
 
         b1 = self._best_epoch(hist1) or {}
         b2 = self._best_epoch(hist2) or {}
         m1 = b1.get('val_metrics', {})
         m2 = b2.get('val_metrics', {})
+
+        # M4c: dataset counts from the actual ingested metadata, not hardcoded.
+        meta = self._load(f'{self.project_root}/data/brisc/brisc_metadata.json') or {}
+        n_cls = meta.get('classification_count')
+        n_seg = meta.get('segmentation_count')
+        dataset_line = (
+            f"BRISC 2025 ({n_cls:,} classification + {n_seg:,} segmentation pairs)"
+            if isinstance(n_cls, int) and isinstance(n_seg, int)
+            else "BRISC 2025 (counts unavailable — run ingestion)"
+        )
 
         # Generate figures
         summary = {}
@@ -292,7 +301,7 @@ class ReportConsolidator:
 
 > **Institution:** ITS Engineering College, AKTU  
 > **Generated:** {ts}  
-> **Dataset:** BRISC 2025 (6,000 classification + 4,793 segmentation pairs)
+> **Dataset:** {dataset_line}
 
 {self._horizontal_rule()}
 
@@ -328,9 +337,9 @@ versus images pre-processed with the WPT→LMMSE→CLAHE enhancement pipeline (E
 | Backbone | EfficientNetB2 (ImageNet pretrained) |
 | Head | GlobalAvgPool → Dropout(0.3) → Linear(4 classes) |
 | Stage 1 (Epochs 1–5) | Backbone frozen, Head warmup with LinearLR |
-| Stage 2 (Epochs 6–30) | Full fine-tuning with differential learning rates (backbone: 1e-5, head: 1e-4) |
+| Stage 2 (Epochs 6–25) | Full fine-tuning with differential learning rates (backbone: 1e-5, head: 1e-4) |
 | Loss | CrossEntropy (label_smoothing=0.1) |
-| Augmentation | Affine + HorizontalFlip + GridDistortion + BrightnessContrast |
+| Augmentation | Affine + HorizontalFlip + ElasticTransform + GaussianBlur + BrightnessContrast |
 | Gradient Clipping | max_norm = 1.0 |
 
 ### 2.2 Results Table
@@ -348,7 +357,7 @@ versus images pre-processed with the WPT→LMMSE→CLAHE enhancement pipeline (E
 ## 3. Key Observations
 
 - Enhancement (Exp 2) is expected to improve CNR and tumour boundary delineation
-- WPT→LMMSE→CLAHE caching eliminates on-the-fly CPU processing during GPU training (estimated 15× speedup)
+- WPT→LMMSE→CLAHE caching eliminates on-the-fly CPU processing during GPU training
 - Class imbalance addressed via label smoothing + pos_weight=10 on the segmentation BCE term
 
 {self._horizontal_rule()}
@@ -366,6 +375,12 @@ versus images pre-processed with the WPT→LMMSE→CLAHE enhancement pipeline (E
         hist3   = self._load(f'{self.results_dir}/metrics_exp3_seg_guided.json') or []
         hist1   = self._load(f'{self.results_dir}/metrics_exp1_baseline.json') or []
         hist2   = self._load(f'{self.results_dir}/metrics_exp2_enhanced.json') or []
+        # M2: held-out TEST metrics (best checkpoint, never seen in train/val).
+        # Absent before the 2026-09-27 fixes; their presence marks a post-fix run.
+        t1      = self._load(f'{self.results_dir}/metrics_exp1_baseline_test.json') or {}
+        t2      = self._load(f'{self.results_dir}/metrics_exp2_enhanced_test.json') or {}
+        t3      = self._load(f'{self.results_dir}/metrics_exp3_seg_guided_test.json') or {}
+        has_test = any([t1, t2, t3])
         xai     = self._load(f'{self.results_dir}/gradcam_localization_summary.json') or {}
         pmram   = self._load(f'{self.results_dir}/pmram_external_validation.json') or {}
 
@@ -401,23 +416,132 @@ versus images pre-processed with the WPT→LMMSE→CLAHE enhancement pipeline (E
         ts = datetime.now().strftime('%Y-%m-%d %H:%M UTC')
         pmram_n = pmram.get('num_samples_evaluated', 'N/A')
 
+        # M2: provenance note reflects what the files actually contain — it
+        # must not stay stale after a genuine post-fix re-run. Test-metric
+        # files only exist for post-fix runs (the pre-fix code never wrote
+        # held-out test metrics).
+        if has_test:
+            provenance_note = (
+                "> **Metrics provenance:** validation columns show the "
+                "best-validation-epoch metrics used for checkpoint selection; "
+                "test columns show the HELD-OUT test set (15% stratified split, "
+                "never used in training or validation) scored with the best "
+                "checkpoint. Exp 3 applies identical segmentation-guided "
+                "masking in train/val/test."
+            )
+        else:
+            provenance_note = (
+                "> **⚠️ Metrics provenance:** no held-out test metrics were found "
+                "(results/metrics_*_test.json missing) — the numbers below are "
+                "best-validation-epoch values from runs that pre-date the "
+                "2026-09-27 code fixes, and Exp 3's come from runs where "
+                "segmentation masking was applied in training but **not** in "
+                "validation. Do not cite; re-run the full pipeline first."
+            )
+
+        exp3_label = ('Exp 3 — Segmentation-Guided' if has_test
+                        else 'Exp 3 — Segmentation-Guided ⚠️ pre-fix')
         all_rows = [
-            ['Exp 1 — Baseline (Raw)',          self._pct(m1.get('accuracy')), self._pct(m1.get('macro_f1')), self._pct(m1.get('macro_precision')), self._pct(m1.get('macro_recall')), b1.get('epoch', 'N/A')],
-            ['Exp 2 — Enhanced (WPT+LMMSE+CLAHE)', self._pct(m2.get('accuracy')), self._pct(m2.get('macro_f1')), self._pct(m2.get('macro_precision')), self._pct(m2.get('macro_recall')), b2.get('epoch', 'N/A')],
-            ['Exp 3 — Segmentation-Guided ⚠️ pre-fix', self._pct(m3.get('accuracy')), self._pct(m3.get('macro_f1')), self._pct(m3.get('macro_precision')), self._pct(m3.get('macro_recall')), b3.get('epoch', 'N/A')],
+            ['Exp 1 — Baseline (Raw)', self._pct(m1.get('accuracy')), self._pct(m1.get('macro_f1')),
+             self._pct(t1.get('accuracy')), self._pct(t1.get('macro_f1')), b1.get('epoch', 'N/A')],
+            ['Exp 2 — Enhanced (WPT+LMMSE+CLAHE)', self._pct(m2.get('accuracy')), self._pct(m2.get('macro_f1')),
+             self._pct(t2.get('accuracy')), self._pct(t2.get('macro_f1')), b2.get('epoch', 'N/A')],
+            [exp3_label, self._pct(m3.get('accuracy')), self._pct(m3.get('macro_f1')),
+             self._pct(t3.get('accuracy')), self._pct(t3.get('macro_f1')), b3.get('epoch', 'N/A')],
         ]
-        headers = ['Experiment', 'Accuracy', 'Macro F1', 'Precision', 'Recall', 'Best Epoch']
+        headers = ['Experiment', 'Val Accuracy', 'Val Macro F1',
+                   'Test Accuracy', 'Test Macro F1', 'Best Epoch']
 
         xai_rows = []
         if isinstance(xai, dict):
-            for cls, metrics in xai.items():
-                if isinstance(metrics, dict):
+            for exp_name, thr_data in xai.items():
+                if not isinstance(thr_data, dict):
+                    continue
+                def _thr_key(kv):
+                    try:
+                        return float(kv[0])
+                    except (TypeError, ValueError):
+                        return 0.0
+                for t_str, m in sorted(thr_data.items(), key=_thr_key):
+                    if not isinstance(m, dict):
+                        continue
                     xai_rows.append([
-                        cls,
-                        f"{metrics.get('mean_iou', 0):.4f}",
-                        f"{metrics.get('mean_dice', 0):.4f}",
-                        str(metrics.get('n_samples', 'N/A')),
+                        exp_name,
+                        t_str,
+                        f"{m.get('mean_iou', 0):.4f} ± {m.get('std_iou', 0):.4f}",
+                        f"{m.get('mean_dice', 0):.4f} ± {m.get('std_dice', 0):.4f}",
+                        str(m.get('n_samples', 'N/A')),
                     ])
+
+        pmram_has_provenance = bool(pmram.get('checkpoint_sha256'))
+        _pmram_ckpt = pmram.get('checkpoint_path', 'unknown')
+        _pmram_prep = pmram.get('preprocessing', 'unknown')
+        if pmram_has_provenance:
+            pmram_caveats = (
+                "> **Provenance:** the evaluated checkpoint and its SHA-256 are recorded in "
+                "results/pmram_external_validation.json "
+                f"(`{_pmram_ckpt}`), evaluated with `{_pmram_prep}` preprocessing — "
+                "the input distribution matching that model's training. The gap in §3 is "
+                "measured on that basis."
+            )
+        else:
+            pmram_caveats = (
+                '> **Caveats:** the "BRISC Internal" reference stored alongside the PMRAM results '
+                "matches Exp 3's best validation epoch, **not** the Exp 1 baseline, and the "
+                "validation script does not record which checkpoint was evaluated — treat the "
+                "gap as indicative, not definitive. A gap of < 5% would indicate strong "
+                "cross-domain robustness *once measured against a matched reference*."
+            )
+        if has_test:
+            conclusion_1 = (
+                "1. **Enhancement impact:** compare the Test Accuracy / Test Macro F1 "
+                "columns above — Exp 2 (WPT→LMMSE→CLAHE) vs the Exp 1 raw baseline. "
+                "A consistent test-set lead for Exp 2 would support the enhancement "
+                "claim; judge only on the held-out test numbers, not validation."
+            )
+            conclusion_2 = (
+                "2. **Segmentation-guided attention (Exp 3):** masking is applied "
+                "identically in train/val/test in this run, so the Exp 3 test "
+                "numbers are a valid comparison against Exp 1/Exp 2."
+            )
+        else:
+            conclusion_1 = (
+                "1. **Enhancement impact:** WPT→LMMSE→CLAHE pre-processing did **not** improve "
+                "classification accuracy in these runs — Exp 2 (enhanced) scored below the "
+                "raw-image baseline Exp 1. Enhancement improved CNR/boundary delineation for "
+                "segmentation; its classification value is unproven."
+            )
+            conclusion_2 = (
+                "2. **Segmentation-guided attention (Exp 3):** reported numbers are **invalid** — "
+                "they come from pre-fix runs where masking was applied in training but not in "
+                "validation. No conclusion can be drawn until Exp 3 is re-run with the fixed "
+                "pipeline (identical masking in train/val/test)."
+            )
+        if xai_rows:
+            conclusion_3 = (
+                "3. **Explainability:** quantitative Grad-CAM localization was measured "
+                "against held-out ground-truth masks (table in §2). IoU > 0.5 indicates "
+                "the model's attention substantially overlaps the annotated tumor region."
+            )
+        else:
+            conclusion_3 = (
+                "3. **Explainability:** quantitative Grad-CAM localization was never run "
+                "(\"data not yet available\") — no spatial-alignment claim may be cited."
+            )
+        if pmram_has_provenance:
+            conclusion_4 = (
+                "4. **Generalization:** PMRAM external validation was run with recorded "
+                "checkpoint provenance (path + SHA-256 in "
+                "results/pmram_external_validation.json) on the input distribution "
+                "matching the evaluated model's training. Judge the gap in §3 on that basis."
+            )
+        else:
+            conclusion_4 = (
+                "4. **Generalization:** PMRAM external validation is encouraging but its "
+                "provenance is unverified (data source recorded as folder-walk, BRISC "
+                "reference mismatched). Re-run with recorded checkpoint provenance before "
+                "citing."
+            )
 
         report = f"""# PHASE II FINAL PROJECT REPORT
 ## MRI Image Enhancing and Tumor Detection
@@ -436,12 +560,7 @@ Grad-CAM XAI localization analysis, and external generalization validation on th
 The segmentation-guided experiment (Exp 3) applies U-Net-derived soft attention weighting
 (not hard RoI cropping) to guide the EfficientNetB2 classifier.
 
-> **⚠️ Metrics provenance:** all classification numbers below are best-validation-epoch
-> values from training runs that pre-date the 2026-09-27 code fixes and were measured
-> **without a held-out test set**. Exp 3 numbers additionally come from runs where
-> segmentation masking was applied during training but **not** during validation
-> (bug fixed in `classification/run_experiments.py` on 2026-09-27) — they are **not**
-> a valid comparison against Exp 1/Exp 2. Re-run all experiments before citing.
+{provenance_note}
 
 {self._horizontal_rule()}
 
@@ -457,10 +576,11 @@ The segmentation-guided experiment (Exp 3) applies U-Net-derived soft attention 
 
 ## 2. Grad-CAM Explainability — Quantitative Localization Analysis
 
-Grad-CAM heatmaps were binarized at the 50th percentile threshold and compared against
-ground-truth U-Net segmentation masks using pixel-level IoU and Dice metrics.
+Grad-CAM heatmaps (predicted class) were binarized at fixed activation thresholds
+(0.3 / 0.5 / 0.7) and compared against ground-truth segmentation masks from the
+held-out test split using pixel-level IoU and Dice metrics.
 
-{self._metric_table(xai_rows, ['Tumour Class', 'Mean IoU', 'Mean Dice', 'Samples']) if xai_rows else '*XAI localization data not yet available. Run Notebook 3 Cell 6 first.*'}
+{self._metric_table(xai_rows, ['Experiment', 'CAM Threshold', 'Mean IoU', 'Mean Dice', 'Samples']) if xai_rows else '*XAI localization data not yet available. Run `python -m explainability.run_localization_eval`.*'}
 
 > **Interpretation:** IoU > 0.5 indicates the model's attention region substantially overlaps
 > with the pathological region confirmed by the radiologist-annotated segmentation mask.
@@ -481,30 +601,16 @@ non-augmented brain MRI scans) to assess cross-dataset generalization.
 
 {'![Generalization Gap](figures/generalization_gap.png)' if fig_gap else '*PMRAM validation data not yet available.*'}
 
-> **Caveats:** the "BRISC Internal" reference stored alongside the PMRAM results
-> matches Exp 3's best validation epoch, **not** the Exp 1 baseline, and the
-> validation script does not record which checkpoint was evaluated — treat the
-> gap as indicative, not definitive. A gap of < 5% would indicate strong
-> cross-domain robustness *once measured against a matched reference*.
+{pmram_caveats}
 
 {self._horizontal_rule()}
 
 ## 4. Conclusions
 
-1. **Enhancement impact:** WPT→LMMSE→CLAHE pre-processing did **not** improve
-   classification accuracy in these runs — Exp 2 (enhanced) scored below the
-   raw-image baseline Exp 1. Enhancement improved CNR/boundary delineation for
-   segmentation; its classification value is unproven.
-2. **Segmentation-guided attention (Exp 3):** reported numbers are **invalid** —
-   they come from pre-fix runs where masking was applied in training but not in
-   validation. No conclusion can be drawn until Exp 3 is re-run with the fixed
-   pipeline (identical masking in train/val/test).
-3. **Explainability:** quantitative Grad-CAM localization was never run
-   ("data not yet available") — no spatial-alignment claim may be cited.
-4. **Generalization:** PMRAM external validation is encouraging but its
-   provenance is unverified (data source recorded as folder-walk, BRISC
-   reference mismatched). Re-run with recorded checkpoint provenance before
-   citing.
+{conclusion_1}
+{conclusion_2}
+{conclusion_3}
+{conclusion_4}
 
 {self._horizontal_rule()}
 
@@ -513,6 +619,11 @@ non-augmented brain MRI scans) to assess cross-dataset generalization.
 - BRISC 2025 is limited to 4 tumor classes; multi-grade glioma sub-typing is planned.
 - DICOM ingestion with native spatial resolution (voxel spacing) is a priority for clinical deployment.
 - Prospective validation on local hospital PACS data is recommended before CE-marking submission.
+- **Open data questions** (unresolvable without the raw datasets — verify on ingestion):
+  patient-level grouping is not enforced (multiple slices per patient would leak
+  across the image-level splits); whether the segmentation task contains
+  `no_tumor` images is unconfirmed; classification folder-name casing on
+  case-sensitive filesystems is assumed from the documented layout.
 
 {self._horizontal_rule()}
 
